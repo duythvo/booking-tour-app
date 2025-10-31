@@ -13,7 +13,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+       "infoPlist": {
+        "NSMicrophoneUsageDescription": "Ứng dụng cần micro để nhận giọng nói trợ lý ảo"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,6 +27,9 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-speech-recognition"
+    ]
   }
 }

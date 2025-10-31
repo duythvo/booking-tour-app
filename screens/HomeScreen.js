@@ -8,8 +8,10 @@ import {
   Image,
   TouchableOpacity,
   TextInput,
+  Alert,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Audio } from "expo-av";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import TourCard from "../components/TourCard";
@@ -20,35 +22,30 @@ export default function HomeScreen() {
   const [filteredTours, setFilteredTours] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
   const navigation = useNavigation();
+  const [recording, setRecording] = useState(null);
 
   useEffect(() => {
     const fetchToursWithImages = async () => {
       try {
-        // 🟢 Lấy tất cả tours
         const toursSnap = await getDocs(collection(db, "tours"));
         const tourList = toursSnap.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        // 🟢 Lấy tất cả images
         const imagesSnap = await getDocs(collection(db, "images"));
         const imageList = imagesSnap.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        // 🧩 Gắn ảnh vào từng tour
         const toursWithImages = tourList.map((tour) => {
           const relatedImages = imageList
             .filter((img) => img.tour_id?.id === tour.id)
             .map((img) => img.image_url);
-
-          return {
-            ...tour,
-            images: relatedImages,
-          };
+          return { ...tour, images: relatedImages };
         });
 
         setTours(toursWithImages);
@@ -63,7 +60,6 @@ export default function HomeScreen() {
     fetchToursWithImages();
   }, []);
 
-  // 🔍 Lọc danh sách theo từ khóa
   useEffect(() => {
     if (!searchText.trim()) {
       setFilteredTours(tours);
@@ -80,9 +76,84 @@ export default function HomeScreen() {
     setFilteredTours(filtered);
   }, [searchText, tours]);
 
+  // --- Gửi audio sang Flask ---
+  const sendAudioToBackend = async (uri) => {
+    try {
+      if (!uri) {
+        alert("File audio không tồn tại");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", {
+        uri,
+        name: "voice.m4a",
+        type: "audio/m4a",
+      });
+
+      const res = await fetch("https://airily-inconvincible-amelie.ngrok-free.dev/voice_search", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const data = await res.json();
+
+      if (data.tour) {
+        navigation.navigate("TourDetail", { tour: data.tour });
+      } else {
+        alert(data.message || "Không tìm thấy tour phù hợp");
+      }
+    } catch (err) {
+      console.error("Lỗi gửi audio:", err);
+      alert("Lỗi gửi giọng nói");
+    }
+  };
+
+  // --- Bắt đầu / dừng ghi âm ---
+  const toggleRecording = async () => {
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Bạn cần cấp quyền micro để sử dụng trợ lý ảo");
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        staysActiveInBackground: false,
+      });
+
+      if (!isRecording) {
+        const rec = new Audio.Recording();
+        await rec.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
+        await rec.startAsync();
+        setRecording(rec);
+        setIsRecording(true);
+      } else {
+        await recording.stopAndUnloadAsync();
+        const uri = recording.getURI();
+        setIsRecording(false);
+        setRecording(null);
+
+        if (uri) {
+          sendAudioToBackend(uri);
+        }
+      }
+    } catch (err) {
+      console.error("Lỗi ghi âm:", err);
+      Alert.alert("Lỗi ghi âm");
+      setIsRecording(false);
+      setRecording(null);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
       <View style={styles.header}>
         <Image
           source={{
@@ -106,7 +177,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* 🔍 Search bar */}
           <View style={styles.searchBar}>
             <Ionicons name="search" size={20} color="#999" />
             <TextInput
@@ -125,7 +195,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabs}>
         <TouchableOpacity style={styles.tabActive}>
           <Ionicons name="heart-outline" size={16} color="#4C67ED" />
@@ -137,7 +206,6 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Tour list */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Nature Escapes</Text>
@@ -147,9 +215,7 @@ export default function HomeScreen() {
         </View>
 
         {loading ? (
-          <Text style={{ textAlign: "center", marginTop: 20 }}>
-            Loading tours...
-          </Text>
+          <Text style={{ textAlign: "center", marginTop: 20 }}>Loading tours...</Text>
         ) : filteredTours.length === 0 ? (
           <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
             No tours found.
@@ -163,6 +229,14 @@ export default function HomeScreen() {
           />
         )}
       </View>
+
+      <TouchableOpacity style={styles.assistantButton} onPress={toggleRecording}>
+        <Ionicons
+          name={isRecording ? "mic" : "mic-outline"}
+          size={28}
+          color="#fff"
+        />
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -172,11 +246,7 @@ const styles = StyleSheet.create({
   header: { position: "relative" },
   headerImage: { width: "100%", height: 220 },
   overlay: { position: "absolute", top: 40, left: 20, right: 20 },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   logo: { width: 40, height: 40 },
   avatar: { width: 36, height: 36, borderRadius: 18 },
   searchBar: {
@@ -193,11 +263,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
-  tabs: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 20,
-  },
+  tabs: { flexDirection: "row", justifyContent: "space-around", marginTop: 20 },
   tabActive: {
     flexDirection: "row",
     alignItems: "center",
@@ -206,11 +272,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 8,
   },
-  tabActiveText: {
-    color: "#4C67ED",
-    marginLeft: 5,
-    fontWeight: "500",
-  },
+  tabActiveText: { color: "#4C67ED", marginLeft: 5, fontWeight: "500" },
   tab: {
     flexDirection: "row",
     alignItems: "center",
@@ -221,11 +283,22 @@ const styles = StyleSheet.create({
   },
   tabText: { marginLeft: 5, color: "#555" },
   section: { marginTop: 25, paddingHorizontal: 20 },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionTitle: { fontSize: 18, fontWeight: "600", color: "#222" },
   seeMore: { color: "#4C67ED", fontWeight: "500" },
+  assistantButton: {
+    position: "absolute",
+    bottom: 40,
+    right: 25,
+    backgroundColor: "#4C67ED",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
 });
