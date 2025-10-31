@@ -9,6 +9,9 @@ import BookingScreen from "./screens/BookingScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import LoginScreen from "./screens/LoginScreen";
 import RegisterScreen from "./screens/RegisterScreen";
+import TourDetail from "./screens/TourDetail";
+import PaymentMethodScreen from "./screens/PaymentMethodScreen";
+import PaymentOptionScreen from "./screens/PaymentOptionScreen";
 import { NavigationContainer } from "@react-navigation/native";
 
 export default function StackNavigator() {
@@ -32,7 +35,6 @@ export default function StackNavigator() {
               ),
           }}
         />
-
         <Tab.Screen
           name="Saved"
           component={SavedScreen}
@@ -44,25 +46,6 @@ export default function StackNavigator() {
                 <AntDesign name="heart" size={24} color="#003580" />
               ) : (
                 <Feather name="heart" size={24} color="black" />
-              ),
-          }}
-        />
-
-        <Tab.Screen
-          name="Bookings"
-          component={BookingScreen}
-          options={{
-            tabBarLabel: "Bookings",
-            headerShown: false,
-            tabBarIcon: ({ focused }) =>
-              focused ? (
-                <Ionicons name="notifications" size={24} color="#003580" />
-              ) : (
-                <Ionicons
-                  name="notifications-outline"
-                  size={24}
-                  color="black"
-                />
               ),
           }}
         />
@@ -103,6 +86,10 @@ export default function StackNavigator() {
           component={BottemTabs}
           options={{ headerShown: false }}
         />
+        <Stack.Screen name="Bookings" component={BookingScreen} />
+        <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} />
+        <Stack.Screen name="PaymentOption" component={PaymentOptionScreen} />
+        <Stack.Screen name="TourDetail" component={TourDetail} />
       </Stack.Navigator>
     </NavigationContainer>
   );
