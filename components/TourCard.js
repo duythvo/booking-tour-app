@@ -1,4 +1,3 @@
-// components/TourCard.js
 import React, { useState } from "react";
 import {
   View,
@@ -82,7 +81,6 @@ export default function TourCard({ tour }) {
         </View>
       )}
 
-      {/* THÔNG TIN */}
       <TouchableOpacity
         onPress={() => navigation.navigate("TourDetail", { tour })}
         style={styles.info}
@@ -101,7 +99,6 @@ export default function TourCard({ tour }) {
         </View>
       </TouchableOpacity>
 
-      {/* MODAL: CHỌN/TẠO LIST */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
