@@ -8,9 +8,10 @@ import {
   Image,
   TouchableOpacity,
   TextInput,
+  Animated,
   Alert,
 } from "react-native";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
@@ -23,11 +24,14 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
-  const navigation = useNavigation();
   const [recording, setRecording] = useState(null);
+  const [chatVisible, setChatVisible] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const navigation = useNavigation();
 
   useEffect(() => {
-    const fetchToursWithImages = async () => {
+    const fetchTours = async () => {
       try {
         const toursSnap = await getDocs(collection(db, "tours"));
         const tourList = toursSnap.docs.map((doc) => ({
@@ -42,48 +46,43 @@ export default function HomeScreen() {
         }));
 
         const toursWithImages = tourList.map((tour) => {
-          const relatedImages = imageList
+          const imgs = imageList
             .filter((img) => img.tour_id?.id === tour.id)
             .map((img) => img.image_url);
-          return { ...tour, images: relatedImages };
+          return { ...tour, images: imgs };
         });
 
         setTours(toursWithImages);
         setFilteredTours(toursWithImages);
-      } catch (error) {
-        console.error("Error loading tours:", error);
+      } catch (err) {
+        console.error("Error loading tours:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchToursWithImages();
+    fetchTours();
   }, []);
 
   useEffect(() => {
     if (!searchText.trim()) {
       setFilteredTours(tours);
-      return;
+    } else {
+      const lower = searchText.toLowerCase();
+      const filtered = tours.filter(
+        (t) =>
+          t.title?.toLowerCase().includes(lower) ||
+          t.description?.toLowerCase().includes(lower) ||
+          t.category?.toLowerCase().includes(lower)
+      );
+      setFilteredTours(filtered);
     }
-
-    const lower = searchText.toLowerCase();
-    const filtered = tours.filter(
-      (t) =>
-        t.title?.toLowerCase().includes(lower) ||
-        t.description?.toLowerCase().includes(lower) ||
-        t.category?.toLowerCase().includes(lower)
-    );
-    setFilteredTours(filtered);
   }, [searchText, tours]);
 
-  // --- Gửi audio sang Flask ---
+  // === GỬI AUDIO LÊN FLASK BACKEND ===
   const sendAudioToBackend = async (uri) => {
+    setIsProcessing(true);
     try {
-      if (!uri) {
-        alert("File audio không tồn tại");
-        return;
-      }
-
       const formData = new FormData();
       formData.append("file", {
         uri,
@@ -91,28 +90,54 @@ export default function HomeScreen() {
         type: "audio/m4a",
       });
 
-      const res = await fetch("https://airily-inconvincible-amelie.ngrok-free.dev/voice_search", {
-        method: "POST",
-        body: formData,
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const res = await fetch(
+        "https://airily-inconvincible-amelie.ngrok-free.dev/voice_search",
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
       const data = await res.json();
+      console.log("Flask response:", data);
 
-      if (data.tour) {
-        navigation.navigate("TourDetail", { tour: data.tour });
+      if (data.tours && data.tours.length > 0) {
+        setFilteredTours(data.tours);
+        Alert.alert("✅ Đã tìm thấy " + data.tours.length + " tour phù hợp");
       } else {
-        alert(data.message || "Không tìm thấy tour phù hợp");
+        Alert.alert("❌ Không tìm thấy tour phù hợp");
       }
     } catch (err) {
       console.error("Lỗi gửi audio:", err);
-      alert("Lỗi gửi giọng nói");
+      Alert.alert("Lỗi gửi giọng nói");
+    } finally {
+      setIsProcessing(false);
+      hideChat();
     }
   };
 
-  // --- Bắt đầu / dừng ghi âm ---
+  // === ANIMATION CHAT BUBBLE ===
+  const showChat = () => {
+    setChatVisible(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideChat = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => setChatVisible(false));
+  };
+
+  // === GHI ÂM / DỪNG GHI ÂM ===
   const toggleRecording = async () => {
     try {
       const { status } = await Audio.requestPermissionsAsync();
@@ -124,129 +149,143 @@ export default function HomeScreen() {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        staysActiveInBackground: false,
       });
 
       if (!isRecording) {
         const rec = new Audio.Recording();
-        await rec.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
+        await rec.prepareToRecordAsync(
+          Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
+        );
         await rec.startAsync();
         setRecording(rec);
         setIsRecording(true);
+        setIsProcessing(false);
+        showChat();
       } else {
         await recording.stopAndUnloadAsync();
         const uri = recording.getURI();
         setIsRecording(false);
         setRecording(null);
-
-        if (uri) {
-          sendAudioToBackend(uri);
-        }
+        setIsProcessing(true); // 👉 Hiện khung "Đang xử lý..."
+        if (uri) sendAudioToBackend(uri);
       }
     } catch (err) {
       console.error("Lỗi ghi âm:", err);
-      Alert.alert("Lỗi ghi âm");
+      Alert.alert("Không thể ghi âm");
       setIsRecording(false);
       setRecording(null);
+      hideChat();
     }
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Image
+            source={{
+              uri: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
+            }}
+            style={styles.headerImage}
+          />
+          <View style={styles.overlay}>
+            <View style={styles.headerTop}>
+              <Image
+                source={{
+                  uri: "https://cdn-icons-png.flaticon.com/512/4712/4712100.png",
+                }}
+                style={styles.logo}
+              />
+              <TouchableOpacity onPress={() => navigation.navigate("Profile")}>
+                <Image
+                  source={{ uri: "https://i.pravatar.cc/150?img=3" }}
+                  style={styles.avatar}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={20} color="#999" />
+              <TextInput
+                placeholder="Tìm kiếm tour, điểm đến..."
+                placeholderTextColor="#aaa"
+                style={styles.searchInput}
+                value={searchText}
+                onChangeText={setSearchText}
+              />
+              {searchText.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchText("")}>
+                  <Ionicons name="close-circle" size={18} color="#999" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          {loading ? (
+            <Text style={{ textAlign: "center", marginTop: 20 }}>
+              Đang tải tour...
+            </Text>
+          ) : filteredTours.length === 0 ? (
+            <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
+              Không có tour phù hợp.
+            </Text>
+          ) : (
+            <FlatList
+              data={filteredTours}
+              keyExtractor={(item, index) =>
+                item.id?.toString() || index.toString()
+              }
+              renderItem={({ item }) => <TourCard tour={item} />}
+              scrollEnabled={false}
+            />
+          )}
+        </View>
+      </ScrollView>
+
+      {/* === Chat Bubble Fixed === */}
+      {chatVisible && (
+        <Animated.View style={[styles.chatBubble, { opacity: fadeAnim }]}>
+          <Text style={styles.chatText}>
+            {isRecording
+              ? "🎤 Mời bạn nói..."
+              : isProcessing
+              ? "🤖 Đang xử lý..."
+              : ""}
+          </Text>
+        </Animated.View>
+      )}
+
+      {/* === Assistant Button Fixed === */}
+      <TouchableOpacity style={styles.assistantButton} onPress={toggleRecording}>
         <Image
           source={{
-            uri: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
+            uri: "https://cdn-icons-png.flaticon.com/512/4712/4712100.png",
           }}
-          style={styles.headerImage}
+          style={styles.botIcon}
         />
-        <View style={styles.overlay}>
-          <View style={styles.headerTop}>
-            <Image
-              source={{
-                uri: "https://cdn-icons-png.flaticon.com/512/5556/5556499.png",
-              }}
-              style={styles.logo}
-            />
-            <TouchableOpacity onPress={() => navigation.navigate("Profile")}>
-              <Image
-                source={{ uri: "https://i.pravatar.cc/150?img=3" }}
-                style={styles.avatar}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color="#999" />
-            <TextInput
-              placeholder="Search tour, destination..."
-              placeholderTextColor="#aaa"
-              style={styles.searchInput}
-              value={searchText}
-              onChangeText={setSearchText}
-            />
-            {searchText.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchText("")}>
-                <Ionicons name="close-circle" size={18} color="#999" />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.tabs}>
-        <TouchableOpacity style={styles.tabActive}>
-          <Ionicons name="heart-outline" size={16} color="#4C67ED" />
-          <Text style={styles.tabActiveText}>Your Interested</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab}>
-          <MaterialIcons name="local-offer" size={16} color="#555" />
-          <Text style={styles.tabText}>Special deals</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Nature Escapes</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeMore}>See More</Text>
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <Text style={{ textAlign: "center", marginTop: 20 }}>Loading tours...</Text>
-        ) : filteredTours.length === 0 ? (
-          <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
-            No tours found.
-          </Text>
-        ) : (
-          <FlatList
-            data={filteredTours}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <TourCard tour={item} />}
-            scrollEnabled={false}
-          />
-        )}
-      </View>
-
-      <TouchableOpacity style={styles.assistantButton} onPress={toggleRecording}>
         <Ionicons
           name={isRecording ? "mic" : "mic-outline"}
           size={28}
           color="#fff"
+          style={{ position: "absolute", bottom: 8 }}
         />
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: "#fff", flex: 1 },
+  container: { backgroundColor: "#fff" },
   header: { position: "relative" },
   headerImage: { width: "100%", height: 220 },
   overlay: { position: "absolute", top: 40, left: 20, right: 20 },
-  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   logo: { width: 40, height: 40 },
   avatar: { width: 36, height: 36, borderRadius: 18 },
   searchBar: {
@@ -263,42 +302,36 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
-  tabs: { flexDirection: "row", justifyContent: "space-around", marginTop: 20 },
-  tabActive: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#E9EEFF",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-  },
-  tabActiveText: { color: "#4C67ED", marginLeft: 5, fontWeight: "500" },
-  tab: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    backgroundColor: "#F5F5F5",
-  },
-  tabText: { marginLeft: 5, color: "#555" },
   section: { marginTop: 25, paddingHorizontal: 20 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  sectionTitle: { fontSize: 18, fontWeight: "600", color: "#222" },
-  seeMore: { color: "#4C67ED", fontWeight: "500" },
   assistantButton: {
     position: "absolute",
     bottom: 40,
     right: 25,
     backgroundColor: "#4C67ED",
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 10,
   },
+  botIcon: { width: 70, height: 70, borderRadius: 35, opacity: 0.9 },
+  chatBubble: {
+    position: "absolute",
+    bottom: 130,
+    right: 35,
+    backgroundColor: "#4C67ED",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    maxWidth: 220,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  chatText: { color: "#fff", fontSize: 16, fontWeight: "500" },
 });

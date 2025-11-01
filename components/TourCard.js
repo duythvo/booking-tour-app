@@ -1,20 +1,31 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, FlatList, Dimensions , TouchableOpacity} from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  FlatList,
+  Dimensions,
+  TouchableOpacity,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
 export default function TourCard({ tour }) {
-    const navigation = useNavigation();
+  const navigation = useNavigation();
   return (
-    <TouchableOpacity onPress={() => navigation.navigate("TourDetail", { tour })} style={styles.card}>
+    <View
+      style={styles.card}
+    >
       {/* Nếu có nhiều ảnh → Carousel */}
       {tour.images && tour.images.length > 0 ? (
         <FlatList
           data={tour.images}
           horizontal
           pagingEnabled
+          nestedScrollEnabled
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item, index) => index.toString()}
           renderItem={({ item }) => (
@@ -22,7 +33,9 @@ export default function TourCard({ tour }) {
               source={{ uri: item }}
               style={styles.carouselImage}
               resizeMode="cover"
-              onError={(e) => console.log("❌ Image error:", e.nativeEvent.error)}
+              onError={(e) =>
+                console.log("❌ Image error:", e.nativeEvent.error)
+              }
             />
           )}
         />
@@ -38,7 +51,7 @@ export default function TourCard({ tour }) {
         </View>
       )}
 
-      <View style={styles.info}>
+      <TouchableOpacity onPress={() => navigation.navigate("TourDetail", { tour })} style={styles.info}>
         <View style={styles.rowBetween}>
           <Text style={styles.category}>
             {tour.category || "Outdoor Adventures"}
@@ -57,8 +70,8 @@ export default function TourCard({ tour }) {
           </Text>
           <Text style={styles.rating}>⭐ {tour.rating || 4.5}</Text>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 }
 
