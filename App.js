@@ -2,7 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { StyleSheet, Text, View, ScrollView } from "react-native";
 import { Provider } from "react-redux";
-import store from "./store";
+import store from "./store/store";
 import StackNavigator from "./StackNavigator";
 
 class ErrorBoundary extends React.Component {
