@@ -3,7 +3,6 @@ import {
   View,
   Text,
   FlatList,
-  Image,
   TouchableOpacity,
   StyleSheet,
   Alert,
@@ -22,18 +21,24 @@ import {
   deleteList,
 } from "../store/savedSlice";
 import { auth } from "../firebase";
+import TourSavedItem from "../components/TourSavedItem";
 
 export default function SavedScreen({ navigation }) {
   const dispatch = useDispatch();
-  const { lists, loading } = useSelector((state) => state.saved || { lists: [] });
+  const { lists = [], loading } = useSelector((state) => state.saved || {});
   const [modalVisible, setModalVisible] = useState(false);
   const [listName, setListName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (auth.currentUser) {
       dispatch(fetchSavedLists());
     }
   }, [dispatch]);
+
+  const filteredLists = lists.filter((list) =>
+    list.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleCreateList = async () => {
     if (!listName.trim()) {
@@ -46,25 +51,21 @@ export default function SavedScreen({ navigation }) {
   };
 
   const handleDeleteList = (listId, listName) => {
-    Alert.alert(
-      "Delete List",
-      `Delete "${listName}"? This cannot be undone.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await dispatch(deleteList(listId)).unwrap();
-              Alert.alert("Deleted!", `"${listName}" has been removed.`);
-            } catch (error) {
-              Alert.alert("Error", error.message || "Failed to delete list.");
-            }
-          },
+    Alert.alert("Delete List", `Delete "${listName}"? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await dispatch(deleteList(listId)).unwrap();
+            Alert.alert("Deleted!", `"${listName}" has been removed.`);
+          } catch (error) {
+            Alert.alert("Error", error.message || "Failed to delete list.");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleRemoveTour = (listId, tourId, tourTitle) => {
@@ -80,14 +81,13 @@ export default function SavedScreen({ navigation }) {
     ]);
   };
 
-  // XEM CHI TIẾT TOUR
   const handleViewTour = (tour) => {
     navigation.navigate("TourDetail", { tour });
   };
 
   if (lists.length === 0 && !loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
+      <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -137,14 +137,26 @@ export default function SavedScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
+    <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.container}>
+
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#888" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search your lists..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
+  
           <FlatList
-            data={lists}
+            data={filteredLists}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingBottom: 100 }}
             renderItem={({ item: list }) => (
@@ -153,59 +165,25 @@ export default function SavedScreen({ navigation }) {
                   <Text style={styles.listName}>{list.name}</Text>
                   <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
                     <Text style={styles.tourCount}>{list.tours.length} saved</Text>
-                    <TouchableOpacity onPress={() => handleDeleteList(list.id, list.name)}>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteList(list.id, list.name)}
+                    >
                       <Ionicons name="trash-outline" size={20} color="#FF5A5F" />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-  
                 <FlatList
                   data={list.tours}
                   keyExtractor={(t) => t.id}
                   renderItem={({ item: tour }) => (
-                    <TouchableOpacity
-                      style={styles.tourItem}
-                      onPress={() => handleViewTour(tour)} // XEM CHI TIẾT
-                      activeOpacity={0.8}
-                    >
-                      <Image
-                        source={{ uri: tour.image_url || tour.images?.[0] }}
-                        style={styles.tourImage}
-                      />
-                      <View style={styles.tourInfo}>
-                        <View style={styles.tourHeader}>
-                          <Text style={styles.tourCategory}>
-                            {tour.category || "Activity"}
-                          </Text>
-                          {tour.rating && (
-                            <View style={styles.ratingContainer}>
-                              <Ionicons name="star" size={14} color="#FFB800" />
-                              <Text style={styles.ratingText}>
-                                {tour.rating} ({tour.reviews || 550})
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.tourTitle} numberOfLines={2}>
-                          {tour.title}
-                        </Text>
-                        <Text style={styles.tourPrice}>
-                          From <Text style={styles.priceAmount}>${tour.price}</Text> per person
-                        </Text>
-                      </View>
-
-              
-                      <TouchableOpacity
-                        style={styles.removeBtn}
-                        onPress={(e) => {
-                          e.stopPropagation(); // NGĂN XEM CHI TIẾT KHI XÓA
-                          handleRemoveTour(list.id, tour.id, tour.title);
-                        }}
-                      >
-                        <Ionicons name="close-circle" size={24} color="#FF5A5F" />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
+                    <TourSavedItem
+                      tour={tour}
+                      onView={handleViewTour}
+                      onRemove={() =>
+                        handleRemoveTour(list.id, tour.id, tour.title)
+                      }
+                    />
                   )}
                 />
               </View>
@@ -248,13 +226,30 @@ export default function SavedScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa" },
+  safeArea: { flex: 1, backgroundColor: "#f8f9fa" },
+  container: { flex: 1 },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    margin: 16,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    marginLeft: 8,
+    fontSize: 16,
+    color: "#333",
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 40,
-    backgroundColor: "#f8f9fa",
   },
   emptyIcon: {
     backgroundColor: "#e3eaff",
@@ -280,7 +275,6 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   createFirstText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-
   listCard: {
     backgroundColor: "#fff",
     marginHorizontal: 16,
@@ -301,74 +295,6 @@ const styles = StyleSheet.create({
   },
   listName: { fontSize: 19, fontWeight: "700", color: "#1a1a1a" },
   tourCount: { fontSize: 14, color: "#888" },
-
-  // TOUR ITEM
-  tourItem: { 
-    flexDirection: "row",
-    marginBottom: 16,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tourImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
-    backgroundColor: "#eee",
-  },
-  tourInfo: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: "space-between",
-  },
-  tourHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  tourCategory: {
-    fontSize: 12,
-    color: "#666",
-    fontWeight: "500",
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  ratingText: {
-    fontSize: 12,
-    color: "#666",
-    fontWeight: "600",
-  },
-  tourTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1a1a1a",
-    marginTop: 4,
-  },
-  tourPrice: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 4,
-  },
-  priceAmount: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1a1a1a",
-  },
-  removeBtn: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-  },
-
-  // FAB
   fab: {
     position: "absolute",
     bottom: 30,
@@ -385,8 +311,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 12,
   },
-
-  // MODAL
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
