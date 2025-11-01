@@ -1,4 +1,4 @@
-// store/savedSlice.js
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';

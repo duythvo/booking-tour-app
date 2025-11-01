@@ -1,3 +1,4 @@
+// screens/LoginScreen.js
 import {
   StyleSheet,
   Text,
@@ -5,38 +6,57 @@ import {
   KeyboardAvoidingView,
   TextInput,
   Pressable,
+  Alert,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { auth } from "../firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { useDispatch } from "react-redux"; // THÊM DÒNG NÀY
+import { fetchSavedLists } from "../store/savedSlice"; // THÊM DÒNG NÀY
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigation = useNavigation();
+  const dispatch = useDispatch(); // THÊM DÒNG NÀY
 
+  // KHI ĐĂNG NHẬP THÀNH CÔNG → LOAD SAVED LISTS
   const login = () => {
-    signInWithEmailAndPassword(auth, email, password).then((userCredential) => {
-      console.log("user credential", userCredential);
-      const user = userCredential.user;
-      console.log("user details", user);
-    });
+    signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        const user = userCredential.user;
+        console.log("Login success:", user.uid);
+
+        // LOAD SAVED LISTS NGAY SAU KHI LOGIN
+        dispatch(fetchSavedLists());
+      })
+      .catch((error) => {
+        Alert.alert("Login Failed", error.message);
+      });
   };
 
+  // TỰ ĐỘNG CHUYỂN QUA MAIN NẾU ĐÃ ĐĂNG NHẬP
   useEffect(() => {
-    try {
-      const unsubcribe = auth.onAuthStateChanged((authUser) => {
-        if (authUser) {
-          navigation.navigate("Main");
-        }
-      });
-      return unsubcribe;
-    } catch (error) {
-      console.log(error);
-    }
-  }, []);
+    const unsubscribe = auth.onAuthStateChanged((authUser) => {
+      if (authUser) {
+        navigation.replace("Main"); // replace để không quay lại login
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  // KHI USER ĐÃ ĐĂNG NHẬP → TỰ ĐỘNG LOAD SAVED LISTS
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        dispatch(fetchSavedLists()); // ĐÚNG: load saved lists
+      }
+    });
+    return unsubscribe;
+  }, [dispatch]); // dispatch đã được import
+
   return (
     <SafeAreaView
       style={{
@@ -57,25 +77,22 @@ const LoginScreen = () => {
           <Text style={{ color: "#003580", fontSize: 17, fontWeight: "600" }}>
             Sign in
           </Text>
-          <Text>Sign In to Your Account</Text>
+          <Text style={{ fontSize: 17, fontWeight: "600", marginTop: 15 }}>
+            Sign In to Your Account
+          </Text>
         </View>
-        <View style={{ gap: 10 }}>
-          <Text
-            style={{
-              marginLeft: 2,
-              fontSize: 15,
-              fontWeight: "700",
-              color: "gray",
-            }}
-          >
+
+        <View style={{ marginTop: 40 }}>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: "gray" }}>
             Email
           </Text>
           <TextInput
             value={email}
-            onChangeText={(text) => setEmail(text)}
+            onChangeText={setEmail}
             style={{
-              fontSize: email ? 17 : 17,
+              fontSize: 17,
               borderWidth: 1,
+              borderColor: "#ccc",
               padding: 10,
               borderRadius: 5,
               width: 300,
@@ -83,24 +100,20 @@ const LoginScreen = () => {
             }}
             placeholder="Enter your email"
             placeholderTextColor={"gray"}
+            autoCapitalize="none"
           />
-          <Text
-            style={{
-              marginLeft: 2,
-              fontSize: 15,
-              fontWeight: "700",
-              color: "gray",
-            }}
-          >
+
+          <Text style={{ fontSize: 15, fontWeight: "700", color: "gray", marginTop: 15 }}>
             Password
           </Text>
           <TextInput
-            secureTextEntry={true}
+            secureTextEntry
             value={password}
-            onChangeText={(text) => setPassword(text)}
+            onChangeText={setPassword}
             style={{
-              fontSize: password ? 17 : 17,
+              fontSize: 17,
               borderWidth: 1,
+              borderColor: "#ccc",
               padding: 10,
               borderRadius: 5,
               width: 300,
@@ -110,6 +123,7 @@ const LoginScreen = () => {
             placeholderTextColor={"gray"}
           />
         </View>
+
         <Pressable
           onPress={login}
           style={{
@@ -117,21 +131,17 @@ const LoginScreen = () => {
             width: 300,
             padding: 14,
             borderRadius: 5,
-            marginTop: 20,
+            marginTop: 30,
           }}
         >
-          <Text
-            style={{ color: "white", fontWeight: "bold", textAlign: "center" }}
-          >
+          <Text style={{ color: "white", fontWeight: "bold", textAlign: "center", fontSize: 16 }}>
             Login
           </Text>
         </Pressable>
-        <Pressable
-          onPress={() => navigation.navigate("Register")}
-          style={{ marginTop: 20 }}
-        >
-          <Text style={{ textAlign: "center", color: "gray", fontSize: 17 }}>
-            Don't have an acount? Sign up
+
+        <Pressable onPress={() => navigation.navigate("Register")} style={{ marginTop: 20 }}>
+          <Text style={{ textAlign: "center", color: "gray", fontSize: 16 }}>
+            Don't have an account? Sign up
           </Text>
         </Pressable>
       </KeyboardAvoidingView>

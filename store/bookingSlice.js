@@ -1,10 +1,9 @@
-// store/bookingSlice.js
 import { createSlice } from "@reduxjs/toolkit";
 
 const bookingSlice = createSlice({
   name: "booking",
   initialState: {
-    items: [], // [{ tour, guests, date, ... }]
+    items: [], 
   },
   reducers: {
     addToCart: (state, action) => {
