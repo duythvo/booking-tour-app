@@ -1,4 +1,3 @@
-// screens/LoginScreen.js
 import {
   StyleSheet,
   Text,
@@ -13,23 +12,23 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { auth } from "../firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { useDispatch } from "react-redux"; // THÊM DÒNG NÀY
-import { fetchSavedLists } from "../store/savedSlice"; // THÊM DÒNG NÀY
+import { useDispatch } from "react-redux"; 
+import { fetchSavedLists } from "../store/savedSlice";
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigation = useNavigation();
-  const dispatch = useDispatch(); // THÊM DÒNG NÀY
+  const dispatch = useDispatch(); 
 
-  // KHI ĐĂNG NHẬP THÀNH CÔNG → LOAD SAVED LISTS
+ 
   const login = () => {
     signInWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
         const user = userCredential.user;
         console.log("Login success:", user.uid);
 
-        // LOAD SAVED LISTS NGAY SAU KHI LOGIN
+       
         dispatch(fetchSavedLists());
       })
       .catch((error) => {
@@ -37,25 +36,24 @@ const LoginScreen = () => {
       });
   };
 
-  // TỰ ĐỘNG CHUYỂN QUA MAIN NẾU ĐÃ ĐĂNG NHẬP
+  
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
       if (authUser) {
-        navigation.replace("Main"); // replace để không quay lại login
+        navigation.replace("Main");
       }
     });
     return unsubscribe;
   }, [navigation]);
 
-  // KHI USER ĐÃ ĐĂNG NHẬP → TỰ ĐỘNG LOAD SAVED LISTS
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        dispatch(fetchSavedLists()); // ĐÚNG: load saved lists
+        dispatch(fetchSavedLists()); 
       }
     });
     return unsubscribe;
-  }, [dispatch]); // dispatch đã được import
+  }, [dispatch]); 
 
   return (
     <SafeAreaView
