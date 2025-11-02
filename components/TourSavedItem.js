@@ -14,34 +14,42 @@ export default function TourSavedItem({ tour, onView, onRemove }) {
         style={styles.tourImage}
       />
       <View style={styles.tourInfo}>
+        {/* SỬA: Đưa nút xóa vào trong header, không absolute */}
         <View style={styles.tourHeader}>
           <Text style={styles.tourCategory}>{tour.category || "Tour"}</Text>
-          {tour.rating && (
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={14} color="#FFB800" />
-              <Text style={styles.ratingText}>
-                {tour.rating} ({tour.reviews || 550})
-              </Text>
-            </View>
-          )}
+
+          <View style={styles.rightSection}>
+            {/* RATING */}
+            {tour.rating && (
+              <View style={styles.ratingContainer}>
+                <Ionicons name="star" size={14} color="#FFB800" />
+                <Text style={styles.ratingText}>
+                  {tour.rating} ({tour.reviews || 250})
+                </Text>
+              </View>
+            )}
+
+            {/* NÚT XÓA – nằm cùng dòng với rating */}
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                onRemove(tour);
+              }}
+              style={styles.removeBtn}
+            >
+              <Ionicons name="close-circle" size={20} color="#FF5A5F" />
+            </TouchableOpacity>
+          </View>
         </View>
+
         <Text style={styles.tourTitle} numberOfLines={2}>
           {tour.title}
         </Text>
+
         <Text style={styles.tourPrice}>
-          From <Text style={styles.priceAmount}>${tour.price}</Text> per person
+          ${tour.price} <Text style={styles.pricePerPerson}>per person</Text>
         </Text>
       </View>
-
-      <TouchableOpacity
-        style={styles.removeBtn}
-        onPress={(e) => {
-          e.stopPropagation();
-          onRemove(tour);
-        }}
-      >
-        <Ionicons name="close-circle" size={24} color="#FF5A5F" />
-      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -80,6 +88,11 @@ const styles = StyleSheet.create({
     color: "#666",
     fontWeight: "500",
   },
+  rightSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   ratingContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -101,14 +114,13 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 4,
   },
-  priceAmount: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1a1a1a",
+  pricePerPerson: {
+    fontSize: 12,
+    color: "#888",
   },
+  // SỬA: Bỏ position absolute
   removeBtn: {
-    position: "absolute",
-    top: 8,
-    right: 8,
+    // Không cần absolute nữa
+    padding: 2,
   },
 });
