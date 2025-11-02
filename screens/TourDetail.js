@@ -19,6 +19,9 @@ export default function TourDetail() {
   const route = useRoute();
   const { tour } = route.params;
 
+  // Sửa: rating 1 chữ số thập phân
+  const formattedRating = (tour.rating || 4.8).toFixed(1);
+
   const highlights = [
     "Guided city tour with local expert",
     "Includes meals and accommodation",
@@ -64,9 +67,11 @@ export default function TourDetail() {
               <Ionicons name="location-outline" size={16} color="#777" />
               <Text style={styles.location}>{tour.location || "Unknown"}</Text>
             </View>
+
+            {/* Sửa: rating có ngôi sao + 1 chữ số thập phân */}
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={styles.rating}>4.8 (230)</Text>
+              <Text style={styles.rating}>{formattedRating} (230)</Text>
             </View>
           </View>
 
@@ -179,7 +184,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   location: { marginLeft: 5, color: "#777", fontSize: 14 },
-  rating: { marginLeft: 5, color: "#333", fontWeight: "600" },
+  rating: { marginLeft: 5, color: "#333", fontWeight: "600" }, // giữ nguyên style
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",

@@ -59,6 +59,11 @@ export default function TourCard({ tour }) {
     setNewListName("");
   };
 
+  // Format rating với 1 chữ số thập phân
+  const formattedRating = (tour.rating || 4.5).toFixed(1);
+  // Format giá với 2 chữ số thập phân nếu cần (giả sử price là number)
+  const formattedPrice = (tour.price || 0).toFixed(2);
+
   return (
     <View style={styles.card}>
       {/* HÌNH ẢNH */}
@@ -92,10 +97,14 @@ export default function TourCard({ tour }) {
           </TouchableOpacity>
         </View>
         <Text style={styles.title}>{tour.title}</Text>
-        <Text style={styles.desc} numberOfLines={2}>{tour.description}</Text>
+        {/* Phần description/detail: Giữ numberOfLines=2 để hiển thị ngắn gọn, nhưng đảm bảo text đúng */}
+        <Text style={styles.desc} numberOfLines={2} ellipsizeMode="tail">{tour.description || "No description available"}</Text>
         <View style={styles.rowBetween}>
-          <Text style={styles.price}>From ${tour.price}/person</Text>
-          <Text style={styles.rating}>Rating {tour.rating || 4.5}</Text>
+          <Text style={styles.price}>From ${formattedPrice}/person</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="star" size={16} color="#FFD700" />
+            <Text style={styles.rating}>{formattedRating}</Text>
+          </View>
         </View>
       </TouchableOpacity>
 
@@ -156,8 +165,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: "700", color: "#222", marginVertical: 6 },
   desc: { fontSize: 14, color: "#555", marginBottom: 10 },
   price: { color: "#4C67ED", fontWeight: "600" },
-  rating: { color: "#555", fontWeight: "500" },
-
+  rating: { color: "#555", fontWeight: "500", marginLeft: 4 },  // Thêm margin để cách ngôi sao
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   modalContent: { backgroundColor: "#fff", padding: 20, borderRadius: 16, width: "85%", maxHeight: "80%" },
   modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: 15, textAlign: "center" },

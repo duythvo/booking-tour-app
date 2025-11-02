@@ -1,120 +1,220 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, Image, Pressable, StyleSheet, Alert } from "react-native";
+// screens/ProfileScreen.js
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { auth } from "../firebase";
-import { signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
-  const [user, setUser] = useState(null);
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (!u) {
-        navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+    const fetchProfile = async () => {
+      if (!user) return;
+
+      try {
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setProfile(docSnap.data());
+        } else {
+          // Tạo profile mặc định nếu chưa có
+          setProfile({
+            name: user.displayName || "User",
+            email: user.email,
+            phone: "",
+            country: "Vietnam",
+            gender: "Male",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      } finally {
+        setLoading(false);
       }
-    });
-    return unsub;
-  }, []);
+    };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigation.reset({ index: 0, routes: [{ name: "Login" }] });
-    } catch (error) {
-      Alert.alert("Logout failed", error.message);
-    }
-  };
+    fetchProfile();
+  }, [user]);
 
-  const avatarInitial =
-    user?.displayName?.charAt(0)?.toUpperCase() ||
-    user?.email?.charAt(0)?.toUpperCase() ||
-    "U";
+  // SỬA: Dẫn đến trang About & Contact
+  const menuItems = [
+    { title: "Save List", icon: "heart-outline", screen: "Saved" },
+    { title: "My Bookings", icon: "receipt-outline", screen: "MyBookings" },
+    { title: "About App", icon: "information-circle-outline", screen: "About" },
+    { title: "Contact Support", icon: "headset-outline", screen: "Contact" },
+    { title: "Language", icon: "globe-outline", screen: "Language" }, // Nếu có
+  ];
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#003580" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Profile</Text>
+      <ScrollView>
+        {/* Header */}
+        <View style={styles.header}>
+          <Image
+            source={{ uri: user?.photoURL || "https://via.placeholder.com/100" }}
+            style={styles.avatar}
+          />
+          <Text style={styles.name}>{profile?.name || "User"}</Text>
+          <Text style={styles.email}>{profile?.email}</Text>
+          {/* THÊM: Hiển thị số điện thoại */}
+          <Text style={styles.phone}>
+            {profile?.phone ? profile.phone : "No phone number"}
+          </Text>
+          <Text style={styles.location}>
+            {profile?.country} · {profile?.gender}
+          </Text>
 
-      <View style={styles.profileCard}>
-        {user?.photoURL ? (
-          <Image source={{ uri: user.photoURL }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>{avatarInitial}</Text>
-          </View>
-        )}
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => navigation.navigate("EditProfile", { user: profile })}
+          >
+            <Ionicons name="create-outline" size={20} color="#fff" />
+            <Text style={styles.editText}>Edit Profile</Text>
+          </TouchableOpacity>
+        </View>
 
-        <Text style={styles.name}>{user?.displayName ?? "No name"}</Text>
-        <Text style={styles.email}>{user?.email ?? "No email"}</Text>
-      </View>
+        {/* Menu */}
+        <View style={styles.menu}>
+          {menuItems.map((item, i) => (
+            <TouchableOpacity
+              key={i}
+              style={styles.menuItem}
+              onPress={() => navigation.navigate(item.screen)}
+            >
+              <Ionicons name={item.icon} size={24} color="#003580" />
+              <Text style={styles.menuText}>{item.title}</Text>
+              <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      <Pressable style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Đăng xuất</Text>
-      </Pressable>
+        {/* Logout */}
+        <TouchableOpacity
+          style={styles.logout}
+          onPress={() => {
+            auth.signOut();
+            navigation.replace("Login");
+          }}
+        >
+          <Ionicons name="log-out-outline" size={24} color="#FF5A5F" />
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    paddingTop: 40,
-  },
+  container: { flex: 1, backgroundColor: "#f9f9f9" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#003580",
-    marginBottom: 20,
-  },
-  profileCard: {
-    width: "90%",
+    backgroundColor: "#003580",
+    padding: 30,
     alignItems: "center",
-    padding: 20,
-    borderRadius: 8,
-    backgroundColor: "#f7f7f7",
-    marginBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    marginBottom: 12,
-  },
-  avatarPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: "#ddd",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  avatarInitial: {
-    fontSize: 36,
-    color: "#555",
-    fontWeight: "700",
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 3,
+    borderColor: "#fff",
   },
   name: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#fff",
+    marginTop: 12,
   },
   email: {
     fontSize: 14,
-    color: "gray",
+    color: "#ddd",
     marginTop: 4,
   },
-  logoutButton: {
-    width: "90%",
-    backgroundColor: "red",
-    padding: 14,
-    borderRadius: 8,
+  // THÊM: Style cho phone
+  phone: {
+    fontSize: 13,
+    color: "#ccc",
+    marginTop: 4,
+  },
+  location: {
+    fontSize: 13,
+    color: "#ccc",
+    marginTop: 6,
+  },
+  editBtn: {
+    flexDirection: "row",
+    backgroundColor: "#004a99",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 16,
     alignItems: "center",
   },
+  editText: {
+    color: "#fff",
+    marginLeft: 6,
+    fontWeight: "600",
+  },
+  menu: {
+    marginTop: 24,
+    paddingHorizontal: 16,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    elevation: 1,
+  },
+  menuText: {
+    flex: 1,
+    marginLeft: 16,
+    fontSize: 16,
+    color: "#222",
+  },
+  logout: {
+    flexDirection: "row",
+    alignItems: "center",
+    margin: 20,
+    padding: 16,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#FF5A5F",
+  },
   logoutText: {
-    color: "white",
-    fontWeight: "700",
+    marginLeft: 10,
+    color: "#FF5A5F",
+    fontWeight: "600",
   },
 });

@@ -59,6 +59,7 @@ export default function PaymentMethodScreen({ navigation, route }) {
         date_issued: serverTimestamp(),
         details: {
           tour_title: tour.title,
+          tour_image: tour.images?.[0] || tour.image_url,
           contact,
           guests,
         },
