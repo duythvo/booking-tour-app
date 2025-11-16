@@ -16,13 +16,30 @@ export default function BookingDetailScreen({ route }) {
   const navigation = useNavigation();
   const details = booking.details || {};
 
+  // Chuyển Firestore timestamp hoặc Date/string sang string
+  const formatDate = (ts) => {
+    if (!ts) return "-";
+    if (ts.seconds)
+      return new Date(ts.seconds * 1000).toLocaleDateString("vi-VN");
+    if (ts.toDate) return ts.toDate().toLocaleDateString("vi-VN");
+    if (ts instanceof Date) return ts.toLocaleDateString("vi-VN");
+    return ts; // string
+  };
+
+  // Tính tổng tiền dựa trên số khách
+  const totalAmount =
+    details.totalAmount ||
+    (details.amount ? details.amount * (details.guests?.length || 1) : 0);
+
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header Image */}
         <View style={styles.header}>
           <Image
-            source={{ uri: details.tour_image || "https://via.placeholder.com/400" }}
+            source={{
+              uri: details.tour_image || "https://via.placeholder.com/400",
+            }}
             style={styles.coverImage}
           />
           <TouchableOpacity
@@ -36,40 +53,59 @@ export default function BookingDetailScreen({ route }) {
         <View style={styles.content}>
           <Text style={styles.title}>{details.tour_title || "Tour"}</Text>
 
-          {/* Booking Info */}
+          {/* Thông tin đặt chỗ */}
           <View style={styles.infoRow}>
             <Ionicons name="calendar-outline" size={18} color="#666" />
             <Text style={styles.infoText}>
-              Booked on: {new Date(booking.date_issued?.seconds * 1000).toLocaleDateString()}
+              Ngày đặt: {formatDate(booking.date_issued)}
             </Text>
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="cash-outline" size={18} color="#666" />
-            <Text style={styles.infoText}>Total: ${booking.amount}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="checkmark-circle-outline" size={18} color="#2e8b2e" />
-            <Text style={[styles.infoText, { color: "#2e8b2e" }]}>
-              {booking.payment_status === "success" ? "Paid" : "Pending Payment"}
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={18}
+              color="#2e8b2e"
+            />
+            <Text
+              style={[
+                styles.infoText,
+                {
+                  color:
+                    booking.payment_status === "success"
+                      ? "#2e8b2e"
+                      : "#d2691e",
+                },
+              ]}
+            >
+              {booking.payment_status === "success"
+                ? "Đã thanh toán"
+                : "Chưa thanh toán"}
             </Text>
           </View>
 
-          {/* Contact */}
-          <Text style={styles.sectionTitle}>Contact Information</Text>
-          <Text style={styles.detailText}>Name: {details.contact?.fullName}</Text>
-          <Text style={styles.detailText}>Email: {details.contact?.email}</Text>
-          <Text style={styles.detailText}>Phone: {details.contact?.phone}</Text>
+          {/* Thông tin liên hệ */}
+          <Text style={styles.sectionTitle}>Thông tin liên hệ</Text>
+          <Text style={styles.detailText}>
+            Họ và tên: {details.contact?.fullName || "-"}
+          </Text>
+          <Text style={styles.detailText}>
+            Email: {details.contact?.email || "-"}
+          </Text>
+          <Text style={styles.detailText}>
+            Số điện thoại: {details.contact?.phone || "-"}
+          </Text>
 
-          {/* Guests */}
+          {/* Danh sách khách */}
           {details.guests && details.guests.length > 0 && (
             <>
-              <Text style={styles.sectionTitle}>Travelers</Text>
+              <Text style={styles.sectionTitle}>Người đi</Text>
               {details.guests.map((guest, i) => (
                 <View key={i} style={styles.guestItem}>
-                  <Text style={styles.guestName}>{guest.name}</Text>
-                  <Text style={styles.guestDob}>DOB: {guest.birth}</Text>
+                  <Text style={styles.guestName}>{guest.name || "-"}</Text>
+                  <Text style={styles.guestDob}>
+                    Ngày sinh: {formatDate(guest.birth)}
+                  </Text>
                 </View>
               ))}
             </>
@@ -80,7 +116,7 @@ export default function BookingDetailScreen({ route }) {
       {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.contactBtn}>
-          <Text style={styles.contactText}>Contact Support</Text>
+          <Text style={styles.contactText}>Liên hệ hỗ trợ</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -111,7 +147,12 @@ const styles = StyleSheet.create({
     color: "#222",
   },
   detailText: { fontSize: 15, color: "#555", marginBottom: 6 },
-  guestItem: { marginBottom: 12, padding: 10, backgroundColor: "#f9f9f9", borderRadius: 8 },
+  guestItem: {
+    marginBottom: 12,
+    padding: 10,
+    backgroundColor: "#f9f9f9",
+    borderRadius: 8,
+  },
   guestName: { fontWeight: "600", color: "#222" },
   guestDob: { color: "#777", fontSize: 13, marginTop: 2 },
   footer: {
@@ -121,7 +162,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   contactBtn: {
-    backgroundColor: "#003580",
+    backgroundColor: "#4C67ED",
     padding: 14,
     borderRadius: 12,
     alignItems: "center",

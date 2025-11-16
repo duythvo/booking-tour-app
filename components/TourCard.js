@@ -28,14 +28,10 @@ export default function TourCard({ tour }) {
 
   const openSaveModal = () => {
     if (lists.length === 0) {
-      Alert.alert(
-        "No Lists",
-        "You don't have any saved lists. Create one?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Create", onPress: () => setModalVisible(true) },
-        ]
-      );
+      Alert.alert("No Lists", "You don't have any saved lists. Create one?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Create", onPress: () => setModalVisible(true) },
+      ]);
     } else {
       setModalVisible(true);
     }
@@ -44,7 +40,10 @@ export default function TourCard({ tour }) {
   const handleAddToList = async (listId) => {
     await dispatch(addTourToList({ listId, tour }));
     setModalVisible(false);
-    Alert.alert("Saved!", `Added to "${lists.find(l => l.id === listId)?.name}"`);
+    Alert.alert(
+      "Saved!",
+      `Added to "${lists.find((l) => l.id === listId)?.name}"`
+    );
   };
 
   const handleCreateAndAdd = async () => {
@@ -62,7 +61,7 @@ export default function TourCard({ tour }) {
   // Format rating với 1 chữ số thập phân
   const formattedRating = (tour.rating || 4.5).toFixed(1);
   // Format giá với 2 chữ số thập phân nếu cần (giả sử price là number)
-  const formattedPrice = (tour.price || 0).toFixed(2);
+  const formattedPrice = tour.price || 0;
 
   return (
     <View style={styles.card}>
@@ -75,11 +74,19 @@ export default function TourCard({ tour }) {
           showsHorizontalScrollIndicator={false}
           keyExtractor={(_, i) => i.toString()}
           renderItem={({ item }) => (
-            <Image source={{ uri: item }} style={styles.carouselImage} resizeMode="cover" />
+            <Image
+              source={{ uri: item }}
+              style={styles.carouselImage}
+              resizeMode="cover"
+            />
           )}
         />
       ) : tour.image_url ? (
-        <Image source={{ uri: tour.image_url }} style={styles.image} resizeMode="cover" />
+        <Image
+          source={{ uri: tour.image_url }}
+          style={styles.image}
+          resizeMode="cover"
+        />
       ) : (
         <View style={styles.imagePlaceholder}>
           <Text>No image</Text>
@@ -91,17 +98,21 @@ export default function TourCard({ tour }) {
         style={styles.info}
       >
         <View style={styles.rowBetween}>
-          <Text style={styles.category}>{tour.category || "Adventure"}</Text>
+          <Text style={styles.category}>
+            {tour.category || "Tour liên tỉnh"}
+          </Text>
           <TouchableOpacity onPress={openSaveModal}>
             <Ionicons name="heart-outline" size={24} color="#FF5A5F" />
           </TouchableOpacity>
         </View>
         <Text style={styles.title}>{tour.title}</Text>
         {/* Phần description/detail: Giữ numberOfLines=2 để hiển thị ngắn gọn, nhưng đảm bảo text đúng */}
-        <Text style={styles.desc} numberOfLines={2} ellipsizeMode="tail">{tour.description || "No description available"}</Text>
+        <Text style={styles.desc} numberOfLines={2} ellipsizeMode="tail">
+          {tour.description || "No description available"}
+        </Text>
         <View style={styles.rowBetween}>
-          <Text style={styles.price}>From ${formattedPrice}/person</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.price}>Từ {formattedPrice} VNĐ/người</Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Ionicons name="star" size={16} color="#FFD700" />
             <Text style={styles.rating}>{formattedRating}</Text>
           </View>
@@ -132,12 +143,18 @@ export default function TourCard({ tour }) {
                 onChangeText={setNewListName}
                 style={styles.input}
               />
-              <TouchableOpacity style={styles.createBtn} onPress={handleCreateAndAdd}>
+              <TouchableOpacity
+                style={styles.createBtn}
+                onPress={handleCreateAndAdd}
+              >
                 <Text style={styles.createBtnText}>Create & Add</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.cancelBtn}>
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={styles.cancelBtn}
+            >
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -156,24 +173,66 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginHorizontal: 15,
   },
-  carouselImage: { width: width - 40, height: 200, borderRadius: 10, marginRight: 10 },
+  carouselImage: {
+    width: width - 40,
+    height: 200,
+    borderRadius: 10,
+    marginRight: 10,
+  },
   image: { width: "100%", height: 200 },
-  imagePlaceholder: { width: "100%", height: 180, justifyContent: "center", alignItems: "center", backgroundColor: "#eee" },
+  imagePlaceholder: {
+    width: "100%",
+    height: 180,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#eee",
+  },
   info: { padding: 15 },
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   category: { color: "#4C67ED", fontWeight: "600", fontSize: 13 },
   title: { fontSize: 16, fontWeight: "700", color: "#222", marginVertical: 6 },
   desc: { fontSize: 14, color: "#555", marginBottom: 10 },
   price: { color: "#4C67ED", fontWeight: "600" },
-  rating: { color: "#555", fontWeight: "500", marginLeft: 4 },  // Thêm margin để cách ngôi sao
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
-  modalContent: { backgroundColor: "#fff", padding: 20, borderRadius: 16, width: "85%", maxHeight: "80%" },
-  modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: 15, textAlign: "center" },
+  rating: { color: "#555", fontWeight: "500", marginLeft: 4 }, // Thêm margin để cách ngôi sao
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 16,
+    width: "85%",
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 15,
+    textAlign: "center",
+  },
   listItem: { padding: 12, borderBottomWidth: 1, borderColor: "#eee" },
   listItemText: { fontSize: 15 },
   createSection: { marginTop: 15 },
-  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 8, padding: 10, marginBottom: 10 },
-  createBtn: { backgroundColor: "#4C67ED", padding: 12, borderRadius: 8, alignItems: "center" },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  createBtn: {
+    backgroundColor: "#4C67ED",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
   createBtnText: { color: "#fff", fontWeight: "600" },
   cancelBtn: { marginTop: 15, alignItems: "center" },
   cancelText: { color: "#666", fontWeight: "600" },

@@ -89,44 +89,44 @@ export default function HomeScreen() {
   }, [searchText, tours]);
 
   // === GỬI AUDIO LÊN FLASK BACKEND ===
-  // const sendAudioToBackend = async (uri) => {
-  //   setIsProcessing(true);
-  //   try {
-  //     const formData = new FormData();
-  //     formData.append("file", {
-  //       uri,
-  //       name: "voice.m4a",
-  //       type: "audio/m4a",
-  //     });
+  const sendAudioToBackend = async (uri) => {
+    setIsProcessing(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", {
+        uri,
+        name: "voice.m4a",
+        type: "audio/m4a",
+      });
 
-  //     const res = await fetch(
-  //       "https://airily-inconvincible-amelie.ngrok-free.dev/voice_search",
-  //       {
-  //         method: "POST",
-  //         body: formData,
-  //         headers: {
-  //           "Content-Type": "multipart/form-data",
-  //         },
-  //       }
-  //     );
+      const res = await fetch(
+        "https://airily-inconvincible-amelie.ngrok-free.dev/voice_search",
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
-  //     const data = await res.json();
-  //     console.log("Flask response:", data);
+      const data = await res.json();
+      console.log("Flask response:", data);
 
-  //     if (data.tours && data.tours.length > 0) {
-  //       setFilteredTours(data.tours);
-  //       Alert.alert("✅ Đã tìm thấy " + data.tours.length + " tour phù hợp");
-  //     } else {
-  //       Alert.alert("❌ Không tìm thấy tour phù hợp");
-  //     }
-  //   } catch (err) {
-  //     console.error("Lỗi gửi audio:", err);
-  //     Alert.alert("Lỗi gửi giọng nói");
-  //   } finally {
-  //     setIsProcessing(false);
-  //     hideChat();
-  //   }
-  // };
+      if (data.tours && data.tours.length > 0) {
+        setFilteredTours(data.tours);
+        Alert.alert("✅ Đã tìm thấy " + data.tours.length + " tour phù hợp");
+      } else {
+        Alert.alert("❌ Không tìm thấy tour phù hợp");
+      }
+    } catch (err) {
+      console.error("Lỗi gửi audio:", err);
+      Alert.alert("Lỗi gửi giọng nói");
+    } finally {
+      setIsProcessing(false);
+      hideChat();
+    }
+  };
 
   // === ANIMATION CHAT BUBBLE ===
   const showChat = () => {

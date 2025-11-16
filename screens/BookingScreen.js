@@ -8,9 +8,11 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 export default function BookingScreen({ navigation, route }) {
   const { tour } = route.params;
@@ -19,15 +21,76 @@ export default function BookingScreen({ navigation, route }) {
     email: "",
     phone: "",
   });
-  const [guests, setGuests] = useState([{ name: "", birth: "" }]);
+  const [guests, setGuests] = useState([{ name: "", birth: new Date() }]);
+  const [showDatePicker, setShowDatePicker] = useState({
+    visible: false,
+    index: null,
+  });
 
-  const handleNext = () => {
-    navigation.navigate("PaymentOption", { tour, contact, guests });
+  const addGuest = () => {
+    if (guests.length >= tour.remaining) {
+      Alert.alert("Lỗi", `Chỉ còn ${tour.remaining} chỗ trống`);
+      return;
+    }
+    setGuests([...guests, { name: "", birth: new Date() }]);
   };
 
-  const addGuest = () => setGuests([...guests, { name: "", birth: "" }]);
   const removeGuest = () => {
     if (guests.length > 1) setGuests(guests.slice(0, -1));
+  };
+
+  const showPicker = (index) => setShowDatePicker({ visible: true, index });
+  const onDateChange = (event, selectedDate) => {
+    if (event.type === "dismissed") {
+      setShowDatePicker({ visible: false, index: null });
+      return;
+    }
+    const arr = [...guests];
+    arr[showDatePicker.index].birth =
+      selectedDate || arr[showDatePicker.index].birth;
+    setGuests(arr);
+    setShowDatePicker({ visible: false, index: null });
+  };
+
+  const handleNext = () => {
+    // Validate contact
+    if (
+      !contact.fullName.trim() ||
+      !contact.email.trim() ||
+      !contact.phone.trim()
+    ) {
+      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin liên hệ");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contact.email)) {
+      Alert.alert("Lỗi", "Email không hợp lệ");
+      return;
+    }
+    const phoneRegex = /^\+?[0-9]{10,15}$/;
+    if (!phoneRegex.test(contact.phone.replace(/\s/g, ""))) {
+      Alert.alert("Lỗi", "Số điện thoại không hợp lệ (10-15 chữ số)");
+      return;
+    }
+
+    // Validate guests
+    for (let i = 0; i < guests.length; i++) {
+      if (!guests[i].name.trim() || !guests[i].birth) {
+        Alert.alert(
+          "Lỗi",
+          `Vui lòng nhập đầy đủ thông tin cho người đi ${i + 1}`
+        );
+        return;
+      }
+    }
+
+    const totalAmount = tour.price * guests.length;
+    navigation.navigate("PaymentOption", {
+      tour,
+      contact,
+      guests,
+      totalAmount,
+    });
   };
 
   return (
@@ -37,22 +100,18 @@ export default function BookingScreen({ navigation, route }) {
         behavior={Platform.OS === "ios" ? "padding" : null}
         keyboardVerticalOffset={80}
       >
-        <ScrollView
-          style={styles.container}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Thông tin tour */}
+        <ScrollView style={styles.container}>
           <View style={styles.tourCard}>
             <Text style={styles.tourTitle}>{tour.title}</Text>
             <Text style={styles.tourSub}>
               {tour.location} · {tour.days || "3 ngày"} chuyến đi
             </Text>
             <Text style={styles.tourPrice}>
-              ${tour.price || 299}
+              {tour.price.toLocaleString("vi-VN")} VNĐ / người
             </Text>
+            <Text>Số chỗ còn lại: {tour.remaining}</Text>
           </View>
 
-          {/* Thông tin liên hệ */}
           <Text style={styles.sectionTitle}>Thông tin liên hệ</Text>
           <TextInput
             style={styles.input}
@@ -75,12 +134,15 @@ export default function BookingScreen({ navigation, route }) {
             onChangeText={(t) => setContact({ ...contact, phone: t })}
           />
 
-          {/* Khách */}
           <View style={styles.guestsHeader}>
             <Text style={styles.sectionTitle}>Khách tham gia</Text>
             <View style={styles.guestButtons}>
               <TouchableOpacity onPress={removeGuest} style={styles.guestBtn}>
-                <Ionicons name="remove-circle-outline" size={28} color="#4C67ED" />
+                <Ionicons
+                  name="remove-circle-outline"
+                  size={28}
+                  color="#4C67ED"
+                />
               </TouchableOpacity>
               <TouchableOpacity onPress={addGuest} style={styles.guestBtn}>
                 <Ionicons name="add-circle-outline" size={28} color="#4C67ED" />
@@ -101,18 +163,26 @@ export default function BookingScreen({ navigation, route }) {
                   setGuests(arr);
                 }}
               />
-              <TextInput
-                style={styles.input}
-                placeholder="Ngày sinh (MM/DD/YYYY)"
-                value={g.birth}
-                onChangeText={(t) => {
-                  const arr = [...guests];
-                  arr[i].birth = t;
-                  setGuests(arr);
-                }}
-              />
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => showPicker(i)}
+              >
+                <Text style={{ color: g.birth ? "#000" : "#999" }}>
+                  {g.birth ? g.birth.toLocaleDateString() : "Chọn ngày sinh"}
+                </Text>
+              </TouchableOpacity>
             </View>
           ))}
+
+          {showDatePicker.visible && (
+            <DateTimePicker
+              value={guests[showDatePicker.index].birth || new Date()}
+              mode="date"
+              display="spinner"
+              maximumDate={new Date()}
+              onChange={onDateChange}
+            />
+          )}
 
           <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
             <Text style={styles.nextText}>Tiếp theo</Text>
@@ -140,6 +210,14 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 8,
     padding: 10,
+    marginBottom: 10,
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    justifyContent: "center",
     marginBottom: 10,
   },
   guestsHeader: {

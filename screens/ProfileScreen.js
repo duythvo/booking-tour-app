@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
@@ -26,31 +27,25 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // ------------ FETCH PROFILE ------------
   const fetchProfile = useCallback(async () => {
     if (!user) return;
-
     try {
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        setProfile(docSnap.data());
-      } else {
+      if (docSnap.exists()) setProfile(docSnap.data());
+      else
         setProfile({
-          name: user.displayName || "User",
+          name: user.displayName || "Người dùng",
           email: user.email,
           phone: "",
           country: "Vietnam",
-          gender: "Male",
+          gender: "Nam",
         });
-      }
     } catch (error) {
-      console.error("Error fetching profile:", error);
+      console.log("Lỗi fetch profile:", error);
     }
   }, [user]);
 
-  // ------------ INITIAL LOAD ------------
   useEffect(() => {
     const load = async () => {
       await fetchProfile();
@@ -59,22 +54,15 @@ export default function ProfileScreen() {
     load();
   }, []);
 
-  // ------------ RELOAD WHEN SCREEN FOCUSES ------------
   useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
-      fetchProfile();
-    });
+    const unsubscribe = navigation.addListener("focus", fetchProfile);
     return unsubscribe;
   }, [navigation, fetchProfile]);
 
-  // ------------ RELOAD WHEN EditProfile RETURNS ------------
   useEffect(() => {
-    if (route.params?.refresh) {
-      fetchProfile();
-    }
+    if (route.params?.refresh) fetchProfile();
   }, [route.params?.refresh]);
 
-  // ------------ REFRESH CONTROL ------------
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchProfile();
@@ -82,55 +70,57 @@ export default function ProfileScreen() {
   };
 
   const menuItems = [
-    { title: "Save List", icon: "heart-outline", screen: "Saved" },
-    { title: "My Bookings", icon: "receipt-outline", screen: "MyBookings" },
-    { title: "About App", icon: "information-circle-outline", screen: "About" },
-    { title: "Contact Support", icon: "headset-outline", screen: "Contact" },
-    { title: "Language", icon: "globe-outline", screen: "Language" },
+    { title: "Danh sách yêu thích", icon: "heart-outline", screen: "Saved" },
+    { title: "Đặt chỗ của tôi", icon: "receipt-outline", screen: "MyBookings" },
+    {
+      title: "Thông tin ứng dụng",
+      icon: "information-circle-outline",
+      screen: "About",
+    },
+    { title: "Hỗ trợ", icon: "headset-outline", screen: "Contact" },
+    { title: "Ngôn ngữ", icon: "globe-outline", screen: "Language" },
   ];
 
-  if (loading) {
+  if (loading)
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#003580" />
       </View>
     );
-  }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Header */}
         <View style={styles.header}>
-          <Image
-            source={{ uri: user?.photoURL || "https://via.placeholder.com/100" }}
-            style={styles.avatar}
-          />
-          <Text style={styles.name}>{profile?.name || "User"}</Text>
+          <Text style={styles.name}>{profile?.name || "Người dùng"}</Text>
           <Text style={styles.email}>{profile?.email}</Text>
-          <Text style={styles.phone}>{profile?.phone || "No phone number"}</Text>
+          <Text style={styles.phone}>
+            {profile?.phone || "Chưa có số điện thoại"}
+          </Text>
           <Text style={styles.location}>
-            {profile?.country} · {profile?.gender}
+            {profile?.country} ·{" "}
+            {profile?.gender === "Male"
+              ? "Nam"
+              : profile?.gender === "Female"
+              ? "Nữ"
+              : "Khác"}
           </Text>
 
           <TouchableOpacity
             style={styles.editBtn}
             onPress={() =>
-              navigation.navigate("EditProfile", {
-                user: profile,
-              })
+              navigation.navigate("EditProfile", { user: profile })
             }
           >
             <Ionicons name="create-outline" size={20} color="#fff" />
-            <Text style={styles.editText}>Edit Profile</Text>
+            <Text style={styles.editText}>Chỉnh sửa</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Menu */}
         <View style={styles.menu}>
           {menuItems.map((item, i) => (
             <TouchableOpacity
@@ -145,7 +135,6 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* Logout */}
         <TouchableOpacity
           style={styles.logout}
           onPress={() => {
@@ -154,10 +143,10 @@ export default function ProfileScreen() {
           }}
         >
           <Ionicons name="log-out-outline" size={24} color="#FF5A5F" />
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -178,27 +167,10 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "#fff",
   },
-  name: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#fff",
-    marginTop: 12,
-  },
-  email: {
-    fontSize: 14,
-    color: "#ddd",
-    marginTop: 4,
-  },
-  phone: {
-    fontSize: 13,
-    color: "#ccc",
-    marginTop: 4,
-  },
-  location: {
-    fontSize: 13,
-    color: "#ccc",
-    marginTop: 6,
-  },
+  name: { fontSize: 22, fontWeight: "bold", color: "#fff", marginTop: 12 },
+  email: { fontSize: 14, color: "#ddd", marginTop: 4 },
+  phone: { fontSize: 13, color: "#ccc", marginTop: 4 },
+  location: { fontSize: 13, color: "#ccc", marginTop: 6 },
   editBtn: {
     flexDirection: "row",
     backgroundColor: "#004a99",
@@ -208,15 +180,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     alignItems: "center",
   },
-  editText: {
-    color: "#fff",
-    marginLeft: 6,
-    fontWeight: "600",
-  },
-  menu: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
+  editText: { color: "#fff", marginLeft: 6, fontWeight: "600" },
+  menu: { marginTop: 24, paddingHorizontal: 16 },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -226,12 +191,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     elevation: 1,
   },
-  menuText: {
-    flex: 1,
-    marginLeft: 16,
-    fontSize: 16,
-    color: "#222",
-  },
+  menuText: { flex: 1, marginLeft: 16, fontSize: 16, color: "#222" },
   logout: {
     flexDirection: "row",
     alignItems: "center",
@@ -243,9 +203,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FF5A5F",
   },
-  logoutText: {
-    marginLeft: 10,
-    color: "#FF5A5F",
-    fontWeight: "600",
-  },
+  logoutText: { marginLeft: 10, color: "#FF5A5F", fontWeight: "600" },
 });

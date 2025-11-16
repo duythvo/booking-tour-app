@@ -3,6 +3,14 @@ import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function BookingItem({ item, onPress }) {
+  const totalAmount = item.totalAmount || 0;
+
+  const issuedDate = item.date_issued
+    ? new Date(item.date_issued).toLocaleDateString("vi-VN")
+    : "N/A";
+
+  const isPaid = item.payment_status === "success";
+
   return (
     <TouchableOpacity
       style={styles.bookingCard}
@@ -18,23 +26,20 @@ export default function BookingItem({ item, onPress }) {
 
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>
-          {item.details?.tour_title || "Unknown Tour"}
+          {item.details?.tour_title || "Tour không xác định"}
         </Text>
 
-        <Text style={styles.date}>
-          Booked on:{" "}
-          {item.date_issued
-            ? new Date(item.date_issued.seconds * 1000).toLocaleDateString()
-            : "N/A"}
-        </Text>
+        <Text style={styles.date}>Ngày đặt: {issuedDate}</Text>
 
         <View style={styles.row}>
-          <Text style={styles.price}>${item.amount}</Text>
+          <Text style={styles.price}>
+            {totalAmount.toLocaleString("vi-VN")} VNĐ
+          </Text>
 
           <View
             style={[
               styles.statusBadge,
-              item.payment_status === "success"
+              isPaid
                 ? { backgroundColor: "#e6f7e6" }
                 : { backgroundColor: "#ffecec" },
             ]}
@@ -42,12 +47,10 @@ export default function BookingItem({ item, onPress }) {
             <Text
               style={[
                 styles.statusText,
-                item.payment_status === "success"
-                  ? { color: "#2e8b2e" }
-                  : { color: "#cc0000" },
+                isPaid ? { color: "#2e8b2e" } : { color: "#cc0000" },
               ]}
             >
-              {item.payment_status === "success" ? "Paid" : "Pending"}
+              {isPaid ? "Đã thanh toán" : "Chưa thanh toán"}
             </Text>
           </View>
         </View>
@@ -83,10 +86,6 @@ const styles = StyleSheet.create({
   date: { fontSize: 13, color: "#777", marginTop: 4 },
   row: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
   price: { fontSize: 16, fontWeight: "bold", color: "#003580" },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
   statusText: { fontSize: 12, fontWeight: "600" },
 });

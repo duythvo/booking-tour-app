@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons, MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import MapView, { Marker } from "react-native-maps";
 
 const { width } = Dimensions.get("window");
 
@@ -19,64 +20,62 @@ export default function TourDetail() {
   const route = useRoute();
   const { tour } = route.params;
 
-  // Sửa: rating 1 chữ số thập phân
-  const formattedRating = (tour.rating || 4.8).toFixed(1);
+  const formattedRating = (tour.rating || 4.5).toFixed(1);
 
   const highlights = [
-    "Guided city tour with local expert",
-    "Includes meals and accommodation",
-    "Free pickup and drop-off",
+    "Hướng dẫn viên địa phương",
+    "Bao gồm ăn uống và chỗ nghỉ",
+    "Đưa đón miễn phí",
   ];
 
   const reviews = [
-    { id: 1, name: "John Doe", rating: 5, comment: "Amazing trip!" },
-    { id: 2, name: "Sarah Lee", rating: 4, comment: "Great experience overall!" },
-    { id: 3, name: "Tom Nguyen", rating: 5, comment: "Loved every moment!" },
+    { id: 1, name: "Nguyễn Văn A", rating: 5, comment: "Tour tuyệt vời!" },
+    { id: 2, name: "Trần Thị B", rating: 4, comment: "Trải nghiệm rất tốt!" },
+    { id: 3, name: "Lê Văn C", rating: 5, comment: "Rất hài lòng!" },
   ];
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Cover Image */}
+        {/* Hình cover */}
         <View style={styles.header}>
           {tour.images && tour.images.length > 0 ? (
             <Image source={{ uri: tour.images[0] }} style={styles.coverImage} />
           ) : (
             <View style={styles.imagePlaceholder}>
-              <Text>No Image</Text>
+              <Text>Không có hình ảnh</Text>
             </View>
           )}
-          {/* Back Button */}
+
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
-          {/* Favorite */}
+
           <TouchableOpacity style={styles.heartButton}>
             <Ionicons name="heart-outline" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        {/* Tour Info */}
+        {/* Thông tin tour */}
         <View style={styles.content}>
-          <Text style={styles.title}>{tour.title || "Untitled Tour"}</Text>
+          <Text style={styles.title}>{tour.title}</Text>
+
           <View style={styles.rowBetween}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Ionicons name="location-outline" size={16} color="#777" />
-              <Text style={styles.location}>{tour.location || "Unknown"}</Text>
+              <Text style={styles.location}>{tour.destination}</Text>
             </View>
 
-            {/* Sửa: rating có ngôi sao + 1 chữ số thập phân */}
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Ionicons name="star" size={16} color="#FFD700" />
               <Text style={styles.rating}>{formattedRating} (230)</Text>
             </View>
           </View>
 
-          {/* Highlights */}
-          <Text style={styles.sectionTitle}>Trip Highlights</Text>
+          <Text style={styles.sectionTitle}>Điểm nổi bật</Text>
           {highlights.map((item, index) => (
             <View style={styles.highlightItem} key={index}>
               <MaterialIcons name="check-circle" size={18} color="#4C67ED" />
@@ -84,31 +83,50 @@ export default function TourDetail() {
             </View>
           ))}
 
-          {/* Description */}
-          <Text style={styles.sectionTitle}>About this tour</Text>
-          <Text style={styles.description}>
-            {tour.description ||
-              "Experience the best of this destination with our expertly crafted itinerary, designed to offer culture, adventure, and relaxation."}
-          </Text>
+          <Text style={styles.sectionTitle}>Mô tả tour</Text>
+          <Text style={styles.description}>{tour.description}</Text>
 
-          {/* Gallery */}
-          {tour.images && tour.images.length > 1 && (
+          {/* Bản đồ */}
+          {tour.locations && tour.locations.length > 0 && (
             <>
-              <Text style={styles.sectionTitle}>Gallery</Text>
-              <FlatList
-                data={tour.images.slice(1)}
-                keyExtractor={(item, index) => index.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                renderItem={({ item }) => (
-                  <Image source={{ uri: item }} style={styles.galleryImage} />
-                )}
-              />
+              <Text style={styles.sectionTitle}>Bản đồ</Text>
+              <MapView
+                style={{ width: "100%", height: 200, borderRadius: 12 }}
+                initialRegion={{
+                  latitude: tour.locations[0].latitude,
+                  longitude: tour.locations[0].longitude,
+                  latitudeDelta: 1.5,
+                  longitudeDelta: 1.5,
+                }}
+              >
+                {tour.locations.map((loc, index) => (
+                  <Marker
+                    key={index}
+                    coordinate={{
+                      latitude: loc.latitude,
+                      longitude: loc.longitude,
+                    }}
+                    title={loc.title}
+                  />
+                ))}
+              </MapView>
             </>
           )}
 
-          {/* Reviews */}
-          <Text style={styles.sectionTitle}>Traveler Reviews</Text>
+          <Text style={styles.sectionTitle}>Hình ảnh khác</Text>
+          {tour.images && tour.images.length > 1 && (
+            <FlatList
+              data={tour.images.slice(1)}
+              keyExtractor={(item, index) => index.toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <Image source={{ uri: item }} style={styles.galleryImage} />
+              )}
+            />
+          )}
+
+          <Text style={styles.sectionTitle}>Đánh giá khách</Text>
           {reviews.map((r) => (
             <View key={r.id} style={styles.reviewCard}>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -117,12 +135,7 @@ export default function TourDetail() {
                   <Text style={styles.reviewerName}>{r.name}</Text>
                   <View style={{ flexDirection: "row" }}>
                     {Array.from({ length: r.rating }).map((_, i) => (
-                      <Ionicons
-                        key={i}
-                        name="star"
-                        size={14}
-                        color="#FFD700"
-                      />
+                      <Ionicons key={i} name="star" size={14} color="#FFD700" />
                     ))}
                   </View>
                 </View>
@@ -135,14 +148,16 @@ export default function TourDetail() {
         </View>
       </ScrollView>
 
-      {/* Book Now Button */}
       <View style={styles.footer}>
         <View>
-          <Text style={styles.priceLabel}>From</Text>
-          <Text style={styles.price}>${tour.price || 299}</Text>
+          <Text style={styles.priceLabel}>Giá từ</Text>
+          <Text style={styles.price}>{tour.price.toLocaleString()} VNĐ</Text>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate("Bookings", { tour })} style={styles.bookButton}>
-          <Text style={styles.bookText}>Book Now</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Bookings", { tour })}
+          style={styles.bookButton}
+        >
+          <Text style={styles.bookText}>Đặt ngay</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -184,7 +199,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   location: { marginLeft: 5, color: "#777", fontSize: 14 },
-  rating: { marginLeft: 5, color: "#333", fontWeight: "600" }, // giữ nguyên style
+  rating: { marginLeft: 5, color: "#333", fontWeight: "600" },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
