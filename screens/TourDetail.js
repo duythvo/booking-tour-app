@@ -1,3 +1,4 @@
+// screens/TourDetail.js - VỚI BẢN ĐỒ
 import React from "react";
 import {
   View,
@@ -8,10 +9,11 @@ import {
   TouchableOpacity,
   FlatList,
   Dimensions,
+  Linking,
 } from "react-native";
 import { Ionicons, MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 
 const { width } = Dimensions.get("window");
 
@@ -34,10 +36,43 @@ export default function TourDetail() {
     { id: 3, name: "Lê Văn C", rating: 5, comment: "Rất hài lòng!" },
   ];
 
+  const defaultCoordinate = {
+    latitude: 10.8231, // TP.HCM
+    longitude: 106.6297,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  };
+
+  const getMapRegion = () => {
+    if (tour.locations && tour.locations.length > 0) {
+      return {
+        latitude: tour.locations[0].latitude,
+        longitude: tour.locations[0].longitude,
+        latitudeDelta: 0.1,
+        longitudeDelta: 0.1,
+      };
+    }
+    
+    // Fallback: Parse từ destination string (nếu có)
+    if (tour.destination) {
+      // Ví dụ: "Hà Nội" -> search coordinates
+      // Bạn có thể thêm mapping hoặc geocoding ở đây
+    }
+    
+    return defaultCoordinate;
+  };
+
+  // ✅ MỞ GOOGLE MAPS
+  const openInGoogleMaps = () => {
+    const region = getMapRegion();
+    const url = `https://www.google.com/maps/search/?api=1&query=${region.latitude},${region.longitude}`;
+    Linking.openURL(url);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Hình cover */}
+        {/* HÌNH COVER */}
         <View style={styles.header}>
           {tour.images && tour.images.length > 0 ? (
             <Image source={{ uri: tour.images[0] }} style={styles.coverImage} />
@@ -59,14 +94,16 @@ export default function TourDetail() {
           </TouchableOpacity>
         </View>
 
-        {/* Thông tin tour */}
+        {/* THÔNG TIN TOUR */}
         <View style={styles.content}>
           <Text style={styles.title}>{tour.title}</Text>
 
           <View style={styles.rowBetween}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Ionicons name="location-outline" size={16} color="#777" />
-              <Text style={styles.location}>{tour.destination}</Text>
+              <Text style={styles.location}>
+                {tour.destination || "Việt Nam"}
+              </Text>
             </View>
 
             <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -75,6 +112,7 @@ export default function TourDetail() {
             </View>
           </View>
 
+          {/* ĐIỂM NỔI BẬT */}
           <Text style={styles.sectionTitle}>Điểm nổi bật</Text>
           {highlights.map((item, index) => (
             <View style={styles.highlightItem} key={index}>
@@ -83,36 +121,56 @@ export default function TourDetail() {
             </View>
           ))}
 
+          {/* MÔ TẢ */}
           <Text style={styles.sectionTitle}>Mô tả tour</Text>
           <Text style={styles.description}>{tour.description}</Text>
 
-          {/* Bản đồ */}
-          {tour.locations && tour.locations.length > 0 && (
-            <>
-              <Text style={styles.sectionTitle}>Bản đồ</Text>
-              <MapView
-                style={{ width: "100%", height: 200, borderRadius: 12 }}
-                initialRegion={{
-                  latitude: tour.locations[0].latitude,
-                  longitude: tour.locations[0].longitude,
-                  latitudeDelta: 1.5,
-                  longitudeDelta: 1.5,
-                }}
-              >
-                {tour.locations.map((loc, index) => (
+          {/* ✅ BẢN ĐỒ */}
+          <Text style={styles.sectionTitle}>Vị trí</Text>
+          <View style={styles.mapContainer}>
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={styles.map}
+              initialRegion={getMapRegion()}
+              showsUserLocation={true}
+              showsMyLocationButton={true}
+            >
+              {/* ✅ MARKER CHO TỪNG VỊ TRÍ */}
+              {tour.locations && tour.locations.length > 0 ? (
+                tour.locations.map((loc, index) => (
                   <Marker
                     key={index}
                     coordinate={{
                       latitude: loc.latitude,
                       longitude: loc.longitude,
                     }}
-                    title={loc.title}
+                    title={loc.title || tour.title}
+                    description={loc.description || ""}
+                    pinColor="#4C67ED"
                   />
-                ))}
-              </MapView>
-            </>
-          )}
+                ))
+              ) : (
+                // ✅ MARKER MẶC ĐỊNH NẾU KHÔNG CÓ LOCATIONS
+                <Marker
+                  coordinate={getMapRegion()}
+                  title={tour.title}
+                  description={tour.destination}
+                  pinColor="#FF5A5F"
+                />
+              )}
+            </MapView>
 
+            {/* NÚT MỞ GOOGLE MAPS */}
+            <TouchableOpacity
+              style={styles.mapButton}
+              onPress={openInGoogleMaps}
+            >
+              <Ionicons name="navigate" size={20} color="#fff" />
+              <Text style={styles.mapButtonText}>Mở bản đồ</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* HÌNH ẢNH KHÁC */}
           <Text style={styles.sectionTitle}>Hình ảnh khác</Text>
           {tour.images && tour.images.length > 1 && (
             <FlatList
@@ -126,6 +184,7 @@ export default function TourDetail() {
             />
           )}
 
+          {/* ĐÁNH GIÁ */}
           <Text style={styles.sectionTitle}>Đánh giá khách</Text>
           {reviews.map((r) => (
             <View key={r.id} style={styles.reviewCard}>
@@ -144,14 +203,17 @@ export default function TourDetail() {
             </View>
           ))}
 
-          <View style={{ height: 80 }} />
+          <View style={{ height: 100 }} />
         </View>
       </ScrollView>
 
+      {/* FOOTER - BOOKING */}
       <View style={styles.footer}>
         <View>
           <Text style={styles.priceLabel}>Giá từ</Text>
-          <Text style={styles.price}>{tour.price.toLocaleString()} VNĐ</Text>
+          <Text style={styles.price}>
+            {tour.price?.toLocaleString() || "0"} VNĐ
+          </Text>
         </View>
         <TouchableOpacity
           onPress={() => navigation.navigate("Bookings", { tour })}
@@ -210,6 +272,41 @@ const styles = StyleSheet.create({
   highlightItem: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
   highlightText: { marginLeft: 8, color: "#555", fontSize: 15 },
   description: { color: "#555", fontSize: 15, lineHeight: 22 },
+  
+  // ✅ MAP STYLES
+  mapContainer: {
+    position: "relative",
+    borderRadius: 12,
+    overflow: "hidden",
+    marginVertical: 10,
+  },
+  map: {
+    width: "100%",
+    height: 250,
+  },
+  mapButton: {
+    position: "absolute",
+    bottom: 15,
+    right: 15,
+    backgroundColor: "#4C67ED",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  mapButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    marginLeft: 6,
+    fontSize: 14,
+  },
+  
   galleryImage: {
     width: 160,
     height: 110,

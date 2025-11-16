@@ -28,9 +28,9 @@ export default function TourCard({ tour }) {
 
   const openSaveModal = () => {
     if (lists.length === 0) {
-      Alert.alert("No Lists", "You don't have any saved lists. Create one?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Create", onPress: () => setModalVisible(true) },
+      Alert.alert("Chưa có danh sách", "Bạn muốn tạo danh sách mới?", [
+        { text: "Hủy", style: "cancel" },
+        { text: "Tạo", onPress: () => setModalVisible(true) },
       ]);
     } else {
       setModalVisible(true);
@@ -38,29 +38,50 @@ export default function TourCard({ tour }) {
   };
 
   const handleAddToList = async (listId) => {
-    await dispatch(addTourToList({ listId, tour }));
-    setModalVisible(false);
-    Alert.alert(
-      "Saved!",
-      `Added to "${lists.find((l) => l.id === listId)?.name}"`
-    );
+    try {
+      const result = await dispatch(addTourToList({ listId, tour })).unwrap();
+
+      setModalVisible(false);
+
+      const listName = lists.find((l) => l.id === listId)?.name;
+      Alert.alert(
+        "✅ Đã lưu!",
+        `Đã thêm "${tour.title}" vào "${listName}"`,
+        [{ text: "OK" }]
+      );
+    } catch (error) {
+      setModalVisible(false);
+
+      if (error === "Tour already exists in this list") {
+        Alert.alert(
+          "⚠️ Tour đã có trong danh sách",
+          `"${tour.title}" đã được lưu trong danh sách này rồi!`,
+          [{ text: "OK" }]
+        );
+      } else {
+        Alert.alert("Lỗi", error);
+      }
+    }
   };
 
   const handleCreateAndAdd = async () => {
     if (!newListName.trim()) {
-      Alert.alert("Error", "Please enter a list name.");
+      Alert.alert("Lỗi", "Vui lòng nhập tên danh sách.");
       return;
     }
-    const action = await dispatch(createNewList(newListName.trim()));
-    if (action.payload) {
-      await handleAddToList(action.payload.id);
+
+    try {
+      const action = await dispatch(createNewList(newListName.trim()));
+      if (action.payload) {
+        await handleAddToList(action.payload.id);
+      }
+      setNewListName("");
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể tạo danh sách mới");
     }
-    setNewListName("");
   };
 
-  // Format rating với 1 chữ số thập phân
   const formattedRating = (tour.rating || 4.5).toFixed(1);
-  // Format giá với 2 chữ số thập phân nếu cần (giả sử price là number)
   const formattedPrice = tour.price || 0;
 
   return (
@@ -105,11 +126,13 @@ export default function TourCard({ tour }) {
             <Ionicons name="heart-outline" size={24} color="#FF5A5F" />
           </TouchableOpacity>
         </View>
+
         <Text style={styles.title}>{tour.title}</Text>
-        {/* Phần description/detail: Giữ numberOfLines=2 để hiển thị ngắn gọn, nhưng đảm bảo text đúng */}
+
         <Text style={styles.desc} numberOfLines={2} ellipsizeMode="tail">
           {tour.description || "No description available"}
         </Text>
+
         <View style={styles.rowBetween}>
           <Text style={styles.price}>Từ {formattedPrice} VNĐ/người</Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -119,10 +142,11 @@ export default function TourCard({ tour }) {
         </View>
       </TouchableOpacity>
 
+      {/* MODAL LƯU TOUR */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Save to List</Text>
+            <Text style={styles.modalTitle}>Lưu vào danh sách</Text>
 
             {lists.map((list) => (
               <TouchableOpacity
@@ -138,7 +162,7 @@ export default function TourCard({ tour }) {
 
             <View style={styles.createSection}>
               <TextInput
-                placeholder="New list name..."
+                placeholder="Tên danh sách mới..."
                 value={newListName}
                 onChangeText={setNewListName}
                 style={styles.input}
@@ -147,7 +171,7 @@ export default function TourCard({ tour }) {
                 style={styles.createBtn}
                 onPress={handleCreateAndAdd}
               >
-                <Text style={styles.createBtnText}>Create & Add</Text>
+                <Text style={styles.createBtnText}>Tạo & Thêm</Text>
               </TouchableOpacity>
             </View>
 
@@ -155,7 +179,7 @@ export default function TourCard({ tour }) {
               onPress={() => setModalVisible(false)}
               style={styles.cancelBtn}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>Hủy</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -197,7 +221,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: "700", color: "#222", marginVertical: 6 },
   desc: { fontSize: 14, color: "#555", marginBottom: 10 },
   price: { color: "#4C67ED", fontWeight: "600" },
-  rating: { color: "#555", fontWeight: "500", marginLeft: 4 }, // Thêm margin để cách ngôi sao
+  rating: { color: "#555", fontWeight: "500", marginLeft: 4 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
