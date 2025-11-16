@@ -58,7 +58,6 @@ export default function TourCard({ tour }) {
           </Text>
           <Ionicons name="heart-outline" size={20} color="#FF5A5F" />
         </View>
-
         <Text style={styles.title}>{tour.title || "Untitled Tour"}</Text>
         <Text style={styles.desc} numberOfLines={2}>
           {tour.description}
