@@ -10,6 +10,7 @@ import {
   TextInput,
   Animated,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
@@ -28,41 +29,49 @@ export default function HomeScreen() {
   const [chatVisible, setChatVisible] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [refreshing, setRefreshing] = useState(false);
+
   const navigation = useNavigation();
 
+  const fetchTours = async () => {
+    try {
+      const toursSnap = await getDocs(collection(db, "tours"));
+      const tourList = toursSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      const imagesSnap = await getDocs(collection(db, "images"));
+      const imageList = imagesSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      const toursWithImages = tourList.map((tour) => {
+        const imgs = imageList
+          .filter((img) => img.tour_id?.id === tour.id)
+          .map((img) => img.image_url);
+        return { ...tour, images: imgs };
+      });
+
+      setTours(toursWithImages);
+      setFilteredTours(toursWithImages);
+    } catch (err) {
+      console.error("Error loading tours:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchTours = async () => {
-      try {
-        const toursSnap = await getDocs(collection(db, "tours"));
-        const tourList = toursSnap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        const imagesSnap = await getDocs(collection(db, "images"));
-        const imageList = imagesSnap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        const toursWithImages = tourList.map((tour) => {
-          const imgs = imageList
-            .filter((img) => img.tour_id?.id === tour.id)
-            .map((img) => img.image_url);
-          return { ...tour, images: imgs };
-        });
-
-        setTours(toursWithImages);
-        setFilteredTours(toursWithImages);
-      } catch (err) {
-        console.error("Error loading tours:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTours();
+    fetchTours().finally(() => setLoading(false));
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTours();
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     if (!searchText.trim()) {
@@ -180,7 +189,13 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View style={styles.header}>
           <Image
             source={{
@@ -258,7 +273,10 @@ export default function HomeScreen() {
       )}
 
       {/* === Assistant Button Fixed === */}
-      <TouchableOpacity style={styles.assistantButton} onPress={toggleRecording}>
+      <TouchableOpacity
+        style={styles.assistantButton}
+        onPress={toggleRecording}
+      >
         <Image
           source={{
             uri: "https://cdn-icons-png.flaticon.com/512/4712/4712100.png",
