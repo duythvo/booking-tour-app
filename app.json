@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-       "infoPlist": {
+      "infoPlist": {
         "NSMicrophoneUsageDescription": "Ứng dụng cần micro để nhận giọng nói trợ lý ảo"
       }
     },
@@ -29,7 +29,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      "expo-audio"
     ]
   }
 }

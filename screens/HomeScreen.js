@@ -11,19 +11,28 @@ import {
   Animated,
   Alert,
   RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import TourCard from "../components/TourCard";
+import SyncIndicator from "../components/SyncIndicator";
 import { useNavigation } from "@react-navigation/native";
+
+const ITEMS_PER_PAGE = 2;
 
 export default function HomeScreen() {
   const [tours, setTours] = useState([]);
+  const [displayedTours, setDisplayedTours] = useState([]);
   const [filteredTours, setFilteredTours] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
+
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState(null);
   const [chatVisible, setChatVisible] = useState(false);
@@ -33,7 +42,7 @@ export default function HomeScreen() {
 
   const navigation = useNavigation();
 
-  const fetchTours = async () => {
+  const fetchAllTours = async () => {
     try {
       const toursSnap = await getDocs(collection(db, "tours"));
       const tourList = toursSnap.docs.map((doc) => ({
@@ -55,7 +64,12 @@ export default function HomeScreen() {
       });
 
       setTours(toursWithImages);
-      setFilteredTours(toursWithImages);
+
+      const initial = toursWithImages.slice(0, ITEMS_PER_PAGE);
+      setDisplayedTours(initial);
+      setFilteredTours(initial);
+      setHasMore(toursWithImages.length > ITEMS_PER_PAGE);
+
     } catch (err) {
       console.error("Error loading tours:", err);
     } finally {
@@ -64,18 +78,43 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    fetchTours().finally(() => setLoading(false));
+    fetchAllTours();
   }, []);
+
+  const loadMoreTours = () => {
+    if (loadingMore || !hasMore || searchText.trim()) return;
+
+    setLoadingMore(true);
+
+    setTimeout(() => {
+      const nextPage = page + 1;
+      const start = page * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE;
+      const moreTours = tours.slice(start, end);
+
+      if (moreTours.length > 0) {
+        setDisplayedTours(prev => [...prev, ...moreTours]);
+        setFilteredTours(prev => [...prev, ...moreTours]);
+        setPage(nextPage);
+        setHasMore(end < tours.length);
+      } else {
+        setHasMore(false);
+      }
+
+      setLoadingMore(false);
+    }, 500);
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchTours();
+    setPage(1);
+    await fetchAllTours();
     setRefreshing(false);
   };
 
   useEffect(() => {
     if (!searchText.trim()) {
-      setFilteredTours(tours);
+      setFilteredTours(displayedTours);
     } else {
       const lower = searchText.toLowerCase();
       const filtered = tours.filter(
@@ -86,9 +125,8 @@ export default function HomeScreen() {
       );
       setFilteredTours(filtered);
     }
-  }, [searchText, tours]);
+  }, [searchText, displayedTours, tours]);
 
-  // === GỬI AUDIO LÊN FLASK BACKEND ===
   const sendAudioToBackend = async (uri) => {
     setIsProcessing(true);
     try {
@@ -111,7 +149,6 @@ export default function HomeScreen() {
       );
 
       const data = await res.json();
-      console.log("Flask response:", data);
 
       if (data.tours && data.tours.length > 0) {
         setFilteredTours(data.tours);
@@ -128,7 +165,6 @@ export default function HomeScreen() {
     }
   };
 
-  // === ANIMATION CHAT BUBBLE ===
   const showChat = () => {
     setChatVisible(true);
     Animated.timing(fadeAnim, {
@@ -146,7 +182,6 @@ export default function HomeScreen() {
     }).start(() => setChatVisible(false));
   };
 
-  // === GHI ÂM / DỪNG GHI ÂM ===
   const toggleRecording = async () => {
     try {
       const { status } = await Audio.requestPermissionsAsync();
@@ -175,7 +210,7 @@ export default function HomeScreen() {
         const uri = recording.getURI();
         setIsRecording(false);
         setRecording(null);
-        setIsProcessing(true); // 👉 Hiện khung "Đang xử lý..."
+        setIsProcessing(true);
         if (uri) sendAudioToBackend(uri);
       }
     } catch (err) {
@@ -187,15 +222,30 @@ export default function HomeScreen() {
     }
   };
 
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#4C67ED" />
+        <Text style={styles.footerText}>Đang tải thêm...</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
+      {/* ✅ SYNC INDICATOR */}
+      <SyncIndicator />
+
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        stickyHeaderIndices={[0]}
       >
+        {/* HEADER */}
         <View style={styles.header}>
           <Image
             source={{
@@ -237,13 +287,15 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* TOUR LIST */}
         <View style={styles.section}>
           {loading ? (
-            <Text style={{ textAlign: "center", marginTop: 20 }}>
-              Đang tải tour...
-            </Text>
+            <View style={styles.centerLoader}>
+              <ActivityIndicator size="large" color="#4C67ED" />
+              <Text style={styles.loadingText}>Đang tải tour...</Text>
+            </View>
           ) : filteredTours.length === 0 ? (
-            <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
+            <Text style={styles.emptyText}>
               Không có tour phù hợp.
             </Text>
           ) : (
@@ -254,25 +306,28 @@ export default function HomeScreen() {
               }
               renderItem={({ item }) => <TourCard tour={item} />}
               scrollEnabled={false}
+              onEndReached={loadMoreTours}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={renderFooter}
             />
           )}
         </View>
       </ScrollView>
 
-      {/* === Chat Bubble Fixed === */}
+      {/* Chat Bubble */}
       {chatVisible && (
         <Animated.View style={[styles.chatBubble, { opacity: fadeAnim }]}>
           <Text style={styles.chatText}>
             {isRecording
               ? "🎤 Mời bạn nói..."
               : isProcessing
-              ? "🤖 Đang xử lý..."
-              : ""}
+                ? "🤖 Đang xử lý..."
+                : ""}
           </Text>
         </Animated.View>
       )}
 
-      {/* === Assistant Button Fixed === */}
+      {/* Assistant Button */}
       <TouchableOpacity
         style={styles.assistantButton}
         onPress={toggleRecording}
@@ -321,6 +376,32 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
   section: { marginTop: 25, paddingHorizontal: 20 },
+  centerLoader: {
+    alignItems: "center",
+    marginTop: 40,
+  },
+  loadingText: {
+    marginTop: 10,
+    color: "#666",
+    fontSize: 14,
+  },
+  emptyText: {
+    textAlign: "center",
+    marginTop: 20,
+    color: "#777",
+    fontSize: 15,
+  },
+  footerLoader: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  footerText: {
+    marginLeft: 10,
+    color: "#666",
+    fontSize: 14,
+  },
   assistantButton: {
     position: "absolute",
     bottom: 40,
