@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -16,12 +15,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
-import { collection, getDocs, query, limit, startAfter, orderBy } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import TourCard from "../components/TourCard";
+import SyncIndicator from "../components/SyncIndicator";
 import { useNavigation } from "@react-navigation/native";
 
-const ITEMS_PER_PAGE = 5; 
+const ITEMS_PER_PAGE = 2;
 
 export default function HomeScreen() {
   const [tours, setTours] = useState([]);
@@ -32,7 +32,7 @@ export default function HomeScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
-  
+
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState(null);
   const [chatVisible, setChatVisible] = useState(false);
@@ -42,7 +42,6 @@ export default function HomeScreen() {
 
   const navigation = useNavigation();
 
- 
   const fetchAllTours = async () => {
     try {
       const toursSnap = await getDocs(collection(db, "tours"));
@@ -65,13 +64,12 @@ export default function HomeScreen() {
       });
 
       setTours(toursWithImages);
-      
-      // LAZY LOADING: Chỉ hiển thị 5 tour đầu tiên
+
       const initial = toursWithImages.slice(0, ITEMS_PER_PAGE);
       setDisplayedTours(initial);
       setFilteredTours(initial);
       setHasMore(toursWithImages.length > ITEMS_PER_PAGE);
-      
+
     } catch (err) {
       console.error("Error loading tours:", err);
     } finally {
@@ -83,18 +81,17 @@ export default function HomeScreen() {
     fetchAllTours();
   }, []);
 
-  // ✅ LOAD MORE KHI SCROLL ĐẾN CUỐI
   const loadMoreTours = () => {
     if (loadingMore || !hasMore || searchText.trim()) return;
-    
+
     setLoadingMore(true);
-    
+
     setTimeout(() => {
       const nextPage = page + 1;
       const start = page * ITEMS_PER_PAGE;
       const end = start + ITEMS_PER_PAGE;
       const moreTours = tours.slice(start, end);
-      
+
       if (moreTours.length > 0) {
         setDisplayedTours(prev => [...prev, ...moreTours]);
         setFilteredTours(prev => [...prev, ...moreTours]);
@@ -103,19 +100,17 @@ export default function HomeScreen() {
       } else {
         setHasMore(false);
       }
-      
+
       setLoadingMore(false);
-    }, 500); // Delay nhỏ để UX mượt hơn
+    }, 500);
   };
 
-  // Refresh
   const onRefresh = async () => {
     setRefreshing(true);
     setPage(1);
     await fetchAllTours();
     setRefreshing(false);
   };
-
 
   useEffect(() => {
     if (!searchText.trim()) {
@@ -132,7 +127,6 @@ export default function HomeScreen() {
     }
   }, [searchText, displayedTours, tours]);
 
-  // Voice search
   const sendAudioToBackend = async (uri) => {
     setIsProcessing(true);
     try {
@@ -228,7 +222,6 @@ export default function HomeScreen() {
     }
   };
 
-  // ✅ FOOTER COMPONENT - Loading indicator
   const renderFooter = () => {
     if (!loadingMore) return null;
     return (
@@ -241,6 +234,9 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
+      {/* ✅ SYNC INDICATOR */}
+      <SyncIndicator />
+
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
@@ -325,8 +321,8 @@ export default function HomeScreen() {
             {isRecording
               ? "🎤 Mời bạn nói..."
               : isProcessing
-              ? "🤖 Đang xử lý..."
-              : ""}
+                ? "🤖 Đang xử lý..."
+                : ""}
           </Text>
         </Animated.View>
       )}

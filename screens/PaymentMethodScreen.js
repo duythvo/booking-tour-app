@@ -1,3 +1,4 @@
+// screens/PaymentMethodScreen.js - FIXED VERSION
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -9,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import {
   addDoc,
   collection,
@@ -20,12 +21,12 @@ import {
 import uuid from "react-native-uuid";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import * as Network from "expo-network";
 import { savePendingBooking } from "../services/database";
 import { checkNetworkStatus } from "../services/syncService";
 
 export default function PaymentMethodScreen({ navigation, route }) {
   const { tour, contact, guests, totalAmount, option } = route.params;
+  const user = auth.currentUser;
   
   const [card, setCard] = useState({
     number: "",
@@ -40,7 +41,6 @@ export default function PaymentMethodScreen({ navigation, route }) {
   // ✅ KIỂM TRA MẠNG KHI VÀO SCREEN
   useEffect(() => {
     checkNetwork();
-    
     const interval = setInterval(checkNetwork, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -50,20 +50,27 @@ export default function PaymentMethodScreen({ navigation, route }) {
     setIsOnline(online);
   };
 
-  // ✅ XỬ LÝ THANH TOÁN OFFLINE
+  // ✅ XỬ LÝ BOOKING OFFLINE (CHỈ TRẢ SAU)
   const handleOfflinePayment = async () => {
     try {
-      // Lưu vào SQLite
+      // Validate guests
+      if (guests.length > tour.remaining) {
+        Alert.alert("Lỗi", `Chỉ còn ${tour.remaining} chỗ trống`);
+        return;
+      }
+
+      // Lưu vào SQLite với userId
       await savePendingBooking({
         tour,
         contact,
         guests,
         totalAmount,
+        userId: user.uid,
       });
       
       Alert.alert(
-        "📴 Đã lưu booking offline",
-        "Booking của bạn sẽ được đồng bộ tự động khi có kết nối mạng.",
+        "✅ Đặt tour thành công (Offline)",
+        "Booking của bạn đã được lưu và sẽ tự động đồng bộ khi có mạng trở lại.",
         [
           {
             text: "OK",
@@ -73,7 +80,7 @@ export default function PaymentMethodScreen({ navigation, route }) {
       );
     } catch (error) {
       console.error("Offline booking error:", error);
-      Alert.alert("Lỗi", "Không thể lưu booking offline");
+      Alert.alert("Lỗi", "Không thể lưu booking: " + error.message);
     }
   };
 
@@ -85,29 +92,31 @@ export default function PaymentMethodScreen({ navigation, route }) {
         return;
       }
 
+      // ✅ FIX 4: VALIDATE CARD CHỈ KHI TRẢ NGAY
+      if (!isPayLater) {
+        if (!card.number || !card.holder || !card.exp || !card.cvv) {
+          Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin thẻ");
+          return;
+        }
+      }
+
       const transactionId = uuid.v4();
 
       // Cập nhật số lượng còn lại
       const tourRef = doc(db, "tours", tour.id);
       await updateDoc(tourRef, { remaining: tour.remaining - guests.length });
 
-      // Lưu checkout
+      // ✅ LƯU CHECKOUT VỚI userId
       const checkoutRef = await addDoc(collection(db, "checkout"), {
         amount: totalAmount,
         payment_date: serverTimestamp(),
         payment_method: isPayLater ? "paylater" : "card",
         payment_status: isPayLater ? "pending" : "success",
         transaction_id: transactionId,
+        userId: user.uid, // ✅ THÊM userId
       });
 
-      // Nếu trả sau thì chỉ lưu checkout
-      if (isPayLater) {
-        Alert.alert("🕐 Thanh toán tạm giữ", "Bạn sẽ thanh toán sau.");
-        navigation.navigate("Main");
-        return;
-      }
-
-      // Tạo invoice
+      // ✅ TẠO INVOICE VỚI userId
       const invoiceRef = await addDoc(collection(db, "invoice"), {
         amount: totalAmount,
         date_issued: serverTimestamp(),
@@ -119,7 +128,8 @@ export default function PaymentMethodScreen({ navigation, route }) {
           tour_price: tour.price,
         },
         checkout_id: checkoutRef.id,
-        payment_status: "success",
+        payment_status: isPayLater ? "pending" : "success",
+        userId: user.uid, // ✅ THÊM userId
       });
 
       // Cập nhật checkout với booking_id
@@ -129,10 +139,12 @@ export default function PaymentMethodScreen({ navigation, route }) {
       });
 
       Alert.alert(
-        "✅ Thanh toán thành công",
-        "Hóa đơn đã được tạo thành công!"
+        isPayLater ? "🕐 Đặt chỗ thành công" : "✅ Thanh toán thành công",
+        isPayLater 
+          ? "Bạn đã đặt tour thành công. Vui lòng thanh toán sau."
+          : "Hóa đơn đã được tạo thành công!",
+        [{ text: "OK", onPress: () => navigation.navigate("Main") }]
       );
-      navigation.navigate("Main");
     } catch (error) {
       console.error("Payment error:", error);
       Alert.alert("❌ Lỗi", "Không thể thực hiện thanh toán");
@@ -140,17 +152,18 @@ export default function PaymentMethodScreen({ navigation, route }) {
   };
 
   // ✅ MAIN HANDLER
-  const handlePayment = async (isPayLater = false) => {
+  const handlePayment = async () => {
     if (isProcessing) return;
     
     setIsProcessing(true);
     
     try {
       if (!isOnline) {
-        // Offline mode
+        // ✅ FIX 5: Offline chỉ có trả sau
         await handleOfflinePayment();
       } else {
         // Online mode
+        const isPayLater = option === "payLater";
         await handleOnlinePayment(isPayLater);
       }
     } catch (error) {
@@ -159,6 +172,9 @@ export default function PaymentMethodScreen({ navigation, route }) {
       setIsProcessing(false);
     }
   };
+
+  // ✅ FIX 4: TRẢ SAU KHÔNG CẦN FORM THẺ
+  const isPayNow = option === "payNow";
 
   return (
     <SafeAreaView style={styles.container}>
@@ -174,7 +190,9 @@ export default function PaymentMethodScreen({ navigation, route }) {
             color="#fff"
           />
           <Text style={styles.networkText}>
-            {isOnline ? "🟢 Online" : "📴 Offline - Booking sẽ được lưu tạm"}
+            {isOnline 
+              ? "🟢 Online" 
+              : "🔴 Offline - Chỉ có thể đặt trả sau"}
           </Text>
         </View>
 
@@ -197,8 +215,8 @@ export default function PaymentMethodScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* PAYMENT FORM */}
-        {isOnline && (
+        {/* ✅ FIX 4 & 5: CHỈ HIỆN FORM THẺ KHI TRẢ NGAY VÀ ONLINE */}
+        {isOnline && isPayNow && (
           <>
             <Text style={styles.sectionTitle}>Thông tin thẻ</Text>
             <TextInput
@@ -245,14 +263,18 @@ export default function PaymentMethodScreen({ navigation, route }) {
               opacity: isProcessing ? 0.6 : 1
             }
           ]}
-          onPress={() => handlePayment(option !== "payNow")}
+          onPress={handlePayment}
           disabled={isProcessing}
         >
           {isProcessing ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.confirmText}>
-              {isOnline ? "Xác nhận và thanh toán" : "Lưu booking offline"}
+              {!isOnline 
+                ? "Lưu booking offline" 
+                : isPayNow 
+                  ? "Xác nhận và thanh toán" 
+                  : "Đặt tour (Trả sau)"}
             </Text>
           )}
         </TouchableOpacity>

@@ -1,4 +1,4 @@
-// store/index.js
+// store/store.js - FIXED
 import { configureStore } from '@reduxjs/toolkit';
 import bookingReducer from './bookingSlice';
 import savedReducer from './savedSlice';
@@ -10,7 +10,12 @@ const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: false,
+      serializableCheck: {
+        // Ignore these action types
+        ignoredActions: ['saved/fetchSavedLists/fulfilled', 'saved/createNewList/fulfilled'],
+        // Ignore these paths in the state
+        ignoredPaths: ['saved.lists'],
+      },
     }),
 });
 

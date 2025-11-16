@@ -1,3 +1,4 @@
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { auth, db } from '../firebase';
 import {
@@ -5,6 +6,8 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 
 const initialState = {
@@ -13,6 +16,7 @@ const initialState = {
   error: null,
 };
 
+// ✅ FIX 1: Fetch saved lists
 export const fetchSavedLists = createAsyncThunk('saved/fetch', async () => {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in");
@@ -23,76 +27,96 @@ export const fetchSavedLists = createAsyncThunk('saved/fetch', async () => {
   return snap.exists() ? snap.data().lists : [];
 });
 
-export const createNewList = createAsyncThunk('saved/create', async (name) => {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in");
-  
-  const newList = { 
-    id: Date.now().toString(), 
-    name, 
-    tours: [],
-    createdAt: new Date().toISOString()
-  };
-  
-  const docRef = doc(db, "savedLists", user.uid);
-  const snap = await getDoc(docRef);
-  
-  if (snap.exists()) {
-    // Đã có document, thêm list mới
-    const currentLists = snap.data().lists || [];
-    await updateDoc(docRef, { 
-      lists: [...currentLists, newList] 
-    });
-  } else {
-    // Chưa có document, tạo mới
-    await setDoc(docRef, { 
-      lists: [newList],
-      userId: user.uid,
-      createdAt: new Date().toISOString()
-    });
-  }
-  
-  return newList;
-});
-
-export const addTourToList = createAsyncThunk(
-  'saved/add', 
-  async ({ listId, tour }, { rejectWithValue }) => {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Not logged in");
-    
-    const docRef = doc(db, "savedLists", user.uid);
-    const snap = await getDoc(docRef);
-    
-    if (!snap.exists()) {
-      return rejectWithValue("Saved lists not found");
+// ✅ FIX 2: Create new list - SỬA ĐỂ KHÔNG BỊ ĐƠ
+export const createNewList = createAsyncThunk(
+  'saved/create',
+  async (name, { rejectWithValue }) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not logged in");
+      
+      const newList = { 
+        id: Date.now().toString(), 
+        name: name.trim(), 
+        tours: [],
+        createdAt: new Date().toISOString()
+      };
+      
+      const docRef = doc(db, "savedLists", user.uid);
+      
+      try {
+        const snap = await getDoc(docRef);
+        
+        if (snap.exists()) {
+          // Document đã tồn tại - dùng arrayUnion
+          await updateDoc(docRef, { 
+            lists: arrayUnion(newList)
+          });
+        } else {
+          // Document chưa tồn tại - tạo mới
+          await setDoc(docRef, { 
+            lists: [newList],
+            userId: user.uid,
+            createdAt: new Date().toISOString()
+          });
+        }
+        
+        return newList;
+      } catch (firestoreError) {
+        console.error("Firestore error:", firestoreError);
+        return rejectWithValue(firestoreError.message);
+      }
+    } catch (error) {
+      console.error("Create list error:", error);
+      return rejectWithValue(error.message);
     }
-    
-    const lists = snap.data().lists || [];
-    const listIndex = lists.findIndex(l => l.id === listId);
-    
-    if (listIndex === -1) {
-      return rejectWithValue("List not found");
-    }
-    
-  
-    const existingTour = lists[listIndex].tours.find(t => t.id === tour.id);
-    if (existingTour) {
-      return rejectWithValue("Tour already exists in this list");
-    }
-    
-    // Thêm tour vào list
-    lists[listIndex].tours.push({
-      ...tour,
-      addedAt: new Date().toISOString()
-    });
-    
-    await updateDoc(docRef, { lists });
-    
-    return { listId, tour };
   }
 );
 
+// ✅ FIX 3: Add tour to list - KIỂM TRA TRÙNG LẶP
+export const addTourToList = createAsyncThunk(
+  'saved/add', 
+  async ({ listId, tour }, { rejectWithValue }) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not logged in");
+      
+      const docRef = doc(db, "savedLists", user.uid);
+      const snap = await getDoc(docRef);
+      
+      if (!snap.exists()) {
+        return rejectWithValue("Saved lists not found");
+      }
+      
+      const lists = snap.data().lists || [];
+      const listIndex = lists.findIndex(l => l.id === listId);
+      
+      if (listIndex === -1) {
+        return rejectWithValue("List not found");
+      }
+      
+      // ✅ KIỂM TRA TOUR ĐÃ CÓ CHƯA
+      const existingTour = lists[listIndex].tours.find(t => t.id === tour.id);
+      if (existingTour) {
+        return rejectWithValue("Tour already exists in this list");
+      }
+      
+      // Thêm tour vào list
+      lists[listIndex].tours.push({
+        ...tour,
+        addedAt: new Date().toISOString()
+      });
+      
+      await updateDoc(docRef, { lists });
+      
+      return { listId, tour };
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// Remove tour from list
 export const removeTourFromList = createAsyncThunk(
   'saved/remove',
   async ({ listId, tourId }, { getState }) => {
@@ -117,6 +141,7 @@ export const removeTourFromList = createAsyncThunk(
   }
 );
 
+// Delete list
 export const deleteList = createAsyncThunk(
   'saved/delete',
   async (listId, { getState }) => {
@@ -158,8 +183,16 @@ const savedSlice = createSlice({
       })
       
       // Create
+      .addCase(createNewList.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(createNewList.fulfilled, (state, action) => {
+        state.loading = false;
         state.lists.push(action.payload);
+      })
+      .addCase(createNewList.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
       
       // Add tour
