@@ -12,12 +12,9 @@ import {
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import {
-  doc,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../firebase";
+
 import {
   updateEmail,
   reauthenticateWithCredential,
@@ -39,7 +36,8 @@ export default function EditProfileScreen({ route }) {
   const [password, setPassword] = useState(""); // Để xác thực lại khi đổi email
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const validatePhone = (phone) => /^\+?[0-9]{10,15}$/.test(phone.replace(/\s/g, ""));
+  const validatePhone = (phone) =>
+    /^\+?[0-9]{10,15}$/.test(phone.replace(/\s/g, ""));
 
   const handleSave = async () => {
     // Validation
@@ -70,7 +68,10 @@ export default function EditProfileScreen({ route }) {
       // Nếu email thay đổi → cần xác thực lại + cập nhật Auth
       if (email !== user.email) {
         if (!password) {
-          Alert.alert("Password Required", "Enter your current password to change email");
+          Alert.alert(
+            "Password Required",
+            "Enter your current password to change email"
+          );
           return;
         }
 
@@ -83,7 +84,7 @@ export default function EditProfileScreen({ route }) {
       await setDoc(userDocRef, updateData, { merge: true });
 
       Alert.alert("Success", "Profile updated successfully!", [
-        { text: "OK", onPress: () => navigation.goBack() },
+        { text: "OK", onPress: () => navigation.goBack({ refresh: true }) },
       ]);
     } catch (error) {
       if (error.code === "auth/wrong-password") {
@@ -152,13 +153,25 @@ export default function EditProfileScreen({ route }) {
         />
 
         {/* Country */}
+        {/* Country */}
         <Text style={styles.label}>Country *</Text>
-        <TextInput
-          style={styles.input}
-          value={country}
-          onChangeText={setCountry}
-          placeholder="Enter your country"
-        />
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={country}
+            onValueChange={(itemValue) => setCountry(itemValue)}
+          >
+            <Picker.Item label="Vietnam" value="Vietnam" />
+            <Picker.Item label="United States" value="United States" />
+            <Picker.Item label="United Kingdom" value="United Kingdom" />
+            <Picker.Item label="Australia" value="Australia" />
+            <Picker.Item label="Canada" value="Canada" />
+            <Picker.Item label="Japan" value="Japan" />
+            <Picker.Item label="South Korea" value="South Korea" />
+            <Picker.Item label="Germany" value="Germany" />
+            <Picker.Item label="France" value="France" />
+            <Picker.Item label="Other" value="Other" />
+          </Picker>
+        </View>
 
         {/* Gender */}
         <Text style={styles.label}>Gender</Text>
@@ -180,7 +193,7 @@ export default function EditProfileScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 , backgroundColor: "#f9f9f9" },
+  container: { flex: 1, backgroundColor: "#f9f9f9" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

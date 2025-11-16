@@ -1,5 +1,5 @@
 // screens/ProfileScreen.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,58 +8,85 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const auth = getAuth();
   const user = auth.currentUser;
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user) return;
+  // ------------ FETCH PROFILE ------------
+  const fetchProfile = useCallback(async () => {
+    if (!user) return;
 
-      try {
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
+    try {
+      const docRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists()) {
-          setProfile(docSnap.data());
-        } else {
-          // Tạo profile mặc định nếu chưa có
-          setProfile({
-            name: user.displayName || "User",
-            email: user.email,
-            phone: "",
-            country: "Vietnam",
-            gender: "Male",
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-      } finally {
-        setLoading(false);
+      if (docSnap.exists()) {
+        setProfile(docSnap.data());
+      } else {
+        setProfile({
+          name: user.displayName || "User",
+          email: user.email,
+          phone: "",
+          country: "Vietnam",
+          gender: "Male",
+        });
       }
-    };
-
-    fetchProfile();
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+    }
   }, [user]);
 
-  // SỬA: Dẫn đến trang About & Contact
+  // ------------ INITIAL LOAD ------------
+  useEffect(() => {
+    const load = async () => {
+      await fetchProfile();
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  // ------------ RELOAD WHEN SCREEN FOCUSES ------------
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchProfile();
+    });
+    return unsubscribe;
+  }, [navigation, fetchProfile]);
+
+  // ------------ RELOAD WHEN EditProfile RETURNS ------------
+  useEffect(() => {
+    if (route.params?.refresh) {
+      fetchProfile();
+    }
+  }, [route.params?.refresh]);
+
+  // ------------ REFRESH CONTROL ------------
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProfile();
+    setRefreshing(false);
+  };
+
   const menuItems = [
     { title: "Save List", icon: "heart-outline", screen: "Saved" },
     { title: "My Bookings", icon: "receipt-outline", screen: "MyBookings" },
     { title: "About App", icon: "information-circle-outline", screen: "About" },
     { title: "Contact Support", icon: "headset-outline", screen: "Contact" },
-    { title: "Language", icon: "globe-outline", screen: "Language" }, // Nếu có
+    { title: "Language", icon: "globe-outline", screen: "Language" },
   ];
 
   if (loading) {
@@ -72,7 +99,11 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView>
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <Image
@@ -81,17 +112,18 @@ export default function ProfileScreen() {
           />
           <Text style={styles.name}>{profile?.name || "User"}</Text>
           <Text style={styles.email}>{profile?.email}</Text>
-          {/* THÊM: Hiển thị số điện thoại */}
-          <Text style={styles.phone}>
-            {profile?.phone ? profile.phone : "No phone number"}
-          </Text>
+          <Text style={styles.phone}>{profile?.phone || "No phone number"}</Text>
           <Text style={styles.location}>
             {profile?.country} · {profile?.gender}
           </Text>
 
           <TouchableOpacity
             style={styles.editBtn}
-            onPress={() => navigation.navigate("EditProfile", { user: profile })}
+            onPress={() =>
+              navigation.navigate("EditProfile", {
+                user: profile,
+              })
+            }
           >
             <Ionicons name="create-outline" size={20} color="#fff" />
             <Text style={styles.editText}>Edit Profile</Text>
@@ -157,7 +189,6 @@ const styles = StyleSheet.create({
     color: "#ddd",
     marginTop: 4,
   },
-  // THÊM: Style cho phone
   phone: {
     fontSize: 13,
     color: "#ccc",
